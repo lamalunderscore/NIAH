@@ -10,8 +10,8 @@ context:
   manually_select_list: null  # null or a list of context lengths to manually select
 
 document_depth:
-  min_percent: 10
-  max_percent: 90
+  min_percent: 0
+  max_percent: 100
   interval: 10
   interval_type: "linear"  # "linear", "sigmoid" or null
   manually_select_list: null  # null or a list of document percents to manually select
@@ -20,5 +20,5 @@ tokenizer:
   tokenizer_type: "Huggingface"
   model_name: "/content/models/recurrent_gemma_default" # Change it to your own model name / HF model path
 
-save_dir: 'prompts'
+save_dir: '/content/LongAlign/Needle_test/prompts'
 
