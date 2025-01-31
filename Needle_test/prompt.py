@@ -331,26 +331,26 @@ if __name__ == '__main__':
         print("🔧 Creating Prompter instance...")
         ht = Prompter(
             needle=config['prompt']['needle'],
-            haystack_dir=config['prompt'],
+            haystack_dir=config['prompt']['haystack_dir'],  # Fix: Access haystack_dir from prompt config
             retrieval_question=config['prompt']['retrieval_question'],
-
+            
             context_lengths_min=config['context']['min_len'],
             context_lengths_max=config['context']['max_len'],
             context_lengths_num_intervals=config['context']['interval'],
             context_lengths=config['context']['manually_select_list'],
-
+            
             document_depth_percent_min=config['document_depth']['min_percent'],
             document_depth_percent_max=config['document_depth']['max_percent'],
             document_depth_percent_intervals=config['document_depth']['interval'],
             document_depth_percents=config['document_depth']['manually_select_list'],
             document_depth_percent_interval_type=config['document_depth']['interval_type'],
-
+            
             tokenizer_type=config['tokenizer']['tokenizer_type'],
             model_name=config['tokenizer']['model_name'],
-
+            
             save_dir=config['save_dir'],
         )
-
+        
         ht.start_test()
         
     except Exception as e:
