@@ -331,7 +331,7 @@ if __name__ == '__main__':
         print("🔧 Creating Prompter instance...")
         ht = Prompter(
             needle=config['prompt']['needle'],
-            haystack_dir=config['prompt']
+            haystack_dir=config['prompt'],
             retrieval_question=config['prompt']['retrieval_question'],
 
             context_lengths_min=config['context']['min_len'],
