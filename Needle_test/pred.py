@@ -30,15 +30,15 @@ from recurrent_gemma.configuration_recurrent_gemma import RecurrentGemmaConfig  
 def pred(model_name, model, tokenizer, input_data, device, max_new_tokens=1024, temperature=0.1):
     try:
         print("🔹 Running prediction...")
-
-        # Extract prompt consistently
-        if isinstance(input_data, list) and len(input_data) >= 2:
-            prompt = input_data[0]['content'] + '\n' + input_data[1]['content']
-        elif isinstance(input_data, dict) and 'needle' in input_data:
-            prompt = input_data['needle']
-        else:
-            print("🚨 Error: Unrecognized input format")
-            return ""
+        prompt = input_data['content'][0]['content'] + '\n' + input_data['content'][1]['content']
+        # # Extract prompt consistently
+        # if isinstance(input_data, list) and len(input_data) >= 2:
+        #     prompt = input_data[0]['content'] + '\n' + input_data[1]['content']
+        # elif isinstance(input_data, dict) and 'needle' in input_data:
+        #     prompt = input_data['needle']
+        # else:
+        #     print("🚨 Error: Unrecognized input format")
+        #     return ""
 
         print(f"🔹 Using prompt: {prompt[:100]}...")
 
