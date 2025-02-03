@@ -17,8 +17,8 @@ from typing import Optional, Union, Tuple
 import traceback
 import sys
 
-# Ensure Python finds 'recurrent_gemma' as a package
-sys.path.append("/content/hybrid-interpretability")
+# If python does not find recurrent_gemma, add to correct directory to path:
+# sys.path.append("path/to/directory")
 
 # Import the model
 
