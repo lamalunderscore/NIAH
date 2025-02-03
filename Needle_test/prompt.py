@@ -325,7 +325,7 @@ class Prompter:
 if __name__ == '__main__':
     try:
         print("📝 Loading configuration...")
-        with open('config-prompt.yaml', 'r') as file:
+        with open('LongAlign/Needle_test/config-prompt.yaml', 'r') as file:
             config = yaml.safe_load(file)
         
         print("🔧 Creating Prompter instance...")
