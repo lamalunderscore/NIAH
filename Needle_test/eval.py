@@ -7,7 +7,7 @@ import requests
 from collections import deque
 from datetime import datetime, timedelta
 
-api_key = ''
+api_key = os.environ["OPENAI_API_KEY"]
 
 def get_criteria():
     cri = 'For this evaluation, you should primarily consider the following criteria:\n'
