@@ -18,7 +18,7 @@ document_depth:
 
 tokenizer:
   tokenizer_type: "Huggingface"
-  model_name: "/content/models/recurrent_gemma_default" # Change it to your own model name / HF model path
+  model_name: "models/recurrent_gemma_default" # Change it to your own model name / HF model path
 
-save_dir: '/content/LongAlign/Needle_test/prompts'
+save_dir: 'LongAlign/Needle_test/prompts'
 
