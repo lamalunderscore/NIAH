@@ -62,5 +62,5 @@ if __name__ == '__main__':
         plt.xticks(rotation=45)
         plt.yticks(rotation=0)
         plt.tight_layout()
-        plt.savefig(f"vis/{os.path.splitext(os.path.basename(file))[0]}.png")
+        plt.savefig(f"LongAlign/Needle_test/vis/{os.path.splitext(os.path.basename(file))[0]}.png")
         plt.close()
