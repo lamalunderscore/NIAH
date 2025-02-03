@@ -1,4 +1,4 @@
-pred_dir: 'pred'
+pred_dir: 'LongAlign/Needle_test/pred'
 save_dir: 'LongAlign/Needle_test/results'
 
 model:
