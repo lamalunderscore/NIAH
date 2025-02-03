@@ -1,5 +1,5 @@
-prompt_dir: 'prompts'
-save_dir: 'pred'
+prompt_dir: 'LongAlign/Needle_test/prompts'
+save_dir: 'LongAlign/Needle_test/pred'
 
 model:
   model_provider: "Huggingface"  # "OpenAI", "Anthropic" or "Huggingface"
