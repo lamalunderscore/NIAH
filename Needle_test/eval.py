@@ -124,7 +124,7 @@ class RateLimitedOpenAI:
 # Update the main execution code
 
 if __name__ == '__main__':
-    with open('config-eval.yaml', 'r') as file:
+    with open('LongAlign/Needle_test/config-eval.yaml', 'r') as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
 
     pred_dir = config['pred_dir']
