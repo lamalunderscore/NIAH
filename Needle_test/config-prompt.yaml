@@ -1,6 +1,6 @@
 prompt:
   needle: "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n"
-  haystack_dir: "PaulGrahamEssays"
+  haystack_dir: "LongAlign/Needle_test/PaulGrahamEssays"
   retrieval_question: "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:" # We use the Anthropic's retrieval question as the default one
 
 context:
