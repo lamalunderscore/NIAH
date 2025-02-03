@@ -18,7 +18,7 @@ import traceback
 import sys
 
 # If python does not find recurrent_gemma, add to correct directory to path:
-# sys.path.append("path/to/directory")
+sys.path.append(".")
 
 # Import the model
 
@@ -98,7 +98,7 @@ def load_model_and_tokenizer(path, device):
 if __name__ == '__main__':
     try:
         print("🔹 Loading configuration...")
-        with open('config-pred.yaml', 'r') as file:
+        with open('LongAlign/Needle_test/config-pred.yaml', 'r') as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
         
         model_provider = config['model']['model_provider']
