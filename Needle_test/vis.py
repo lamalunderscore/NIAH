@@ -10,8 +10,8 @@ import glob
 if __name__ == '__main__':
     json_files = glob.glob("LongAlign/Needle_test/results/*.json")
 
-    if not os.path.exists('vis'):
-        os.makedirs('vis')
+    if not os.path.exists('LongAlign/Needle_test/vis'):
+        os.makedirs('LongAlign/Needle_test/vis')
 
     for file in json_files:
         data = []
