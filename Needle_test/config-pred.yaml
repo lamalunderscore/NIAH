@@ -3,4 +3,4 @@ save_dir: 'pred'
 
 model:
   model_provider: "Huggingface"  # "OpenAI", "Anthropic" or "Huggingface"
-  model_name: "/content/models/recurrent_gemma_default"
+  model_name: "../../models/recurrent_gemma_default"
