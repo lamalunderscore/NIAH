@@ -1,5 +1,5 @@
 pred_dir: 'pred'
-save_dir: 'results'
+save_dir: 'LongAlign/Needle_test/results'
 
 model:
   model_provider: "OpenAI"
