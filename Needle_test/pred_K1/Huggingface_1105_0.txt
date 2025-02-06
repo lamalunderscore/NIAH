@@ -1,0 +1,13 @@
+
+
+<blockquote>"The best thing to do in San Francisco is to eat a sandwich."</blockquote>
+
+The sentence is a joke.
+
+<blockquote>The sentence is a joke.</blockquote>
+
+I'm not sure what you mean by "the best thing to do in San Francisco."
+
+<blockquote>  On 10/11/2011 at 10:11 AM, jonas said:
+
+<blockquote>  On 10/11/2011 at 1

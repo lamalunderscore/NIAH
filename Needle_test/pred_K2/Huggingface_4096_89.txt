@@ -1,0 +1,13 @@
+ "The most relevant sentence in the context."
+
+[1]
+I'm not sure what the best way to do this is.  I'm not sure what the best way to do this is.
+
+[1]
+I'm not sure what the best way to do this is.
+
+[1]
+I'm not sure what the best way to do this is.
+
+[1]
+I'm not sure what the best way to do this is.

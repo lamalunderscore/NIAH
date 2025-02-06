@@ -1,0 +1,12 @@
+ "The best thing to do in San Francisco is to eat a sandwich."
+
+[3]
+The best thing to do in San Francisco is eat a sandwich.
+
+[1] http://en.wikipedia.org/wiki/Berkeley_Philosophies_of_Human_Knowledge
+
+[1] http://en.wikipedia.org/wiki/Berkeley_Philosophies_of_Human_Knowledge
+
+[Answer 1]
+
+I'm not sure if this is the right place to

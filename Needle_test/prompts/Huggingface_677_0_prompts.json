@@ -1,0 +1,18 @@
+{
+  "model": "google/recurrentgemma-2b",
+  "tokenizer": "Huggingface",
+  "context_length": 677,
+  "depth_percent": 0,
+  "needle": "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n",
+  "retrieval_question": "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:",
+  "content": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\nSeptember 2007In high school I decided I was going to study philosophy in college.\nI had several motives, some more honorable than others.  One of the\nless honorable was to shock people.  College was regarded as job\ntraining where I grew up, so studying philosophy seemed an impressively\nimpractical thing to do.  Sort of like slashing holes in your clothes\nor putting a safety pin through your ear, which were other forms\nof impressive impracticality then just coming into fashion.But I had some more honest motives as well.  I thought studying\nphilosophy would be a shortcut straight to wisdom.  All the people\nmajoring in other things would just end up with a bunch of domain\nknowledge.  I would be learning what was really what.I'd tried to read a few philosophy books.  Not recent ones; you\nwouldn't find those in our high school library.  But I tried to\nread Plato and Aristotle.  I doubt I believed I understood them,\nbut they sounded like they were talking about something important.\nI assumed I'd learn what in college.The summer before senior year I took some college classes.  I learned\na lot in the calculus class, but I didn't learn much in Philosophy\n101.  And yet my plan to study philosophy remained intact.  It was\nmy fault I hadn't learned anything.  I hadn't read the books we\nwere assigned carefully enough.  I'd give Berkeley's Principles\nof Human Knowledge another shot in college.  Anything so admired\nand so difficult to read must have something in it, if one could\nonly figure out what.Twenty-six years later, I still don't understand Berkeley.  I have\na nice edition of his collected works.  Will I ever read it?  Seems\nunlikely.The difference between then and now is that now I understand why\nBerkeley is probably not worth trying to understand.  I think I see\nnow what went wrong with philosophy, and how we might fix it.WordsI did end up being a philosophy major for most of college.  It\ndidn't work out as\n\nWhat is the best thing to do in San Francisco? Here is the most relevant sentence in the context:"
+    }
+  ]
+}
