@@ -30,6 +30,17 @@ from recurrentgemma import torch as recurrentgemma
 sys.path.append(".")
 
 
+def find_sequence(inputs, needle):
+    print(needle)
+    print(inputs)
+    needle_len = needle.size(0)
+    input_len = inputs.size(0)
+    for i in range(input_len - needle_len + 1):
+        if torch.equal(inputs[i : i + needle_len], needle):
+            return [pos for pos in range(i, i + needle_len)]
+    return None
+
+
 def pred(
     model_name,
     model,
@@ -158,6 +169,9 @@ if __name__ == "__main__":
         prompt_dir = config["prompt_dir"]
         save_dir = config["save_dir"]
         k_indeces = config["k"]
+        needle_focus = config["needle"]["focus"]
+        needle_scaling = config["needle"]["scaling"]
+        needle_str = config["needle"]["needle"]
 
         print(f"🔹 Prompt directory (relative): {prompt_dir}")
         print(f"🔹 Prompt directory (absolute): {os.path.abspath(prompt_dir)}")
@@ -188,6 +202,9 @@ if __name__ == "__main__":
         vocab.Load(
             "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
         )
+        if needle_focus:
+            needle_ids = vocab.encode(needle_str, out_type=int)
+
         sampler = recurrentgemma.Sampler(model=model, vocab=vocab)
 
         pattern = f"{prompt_dir}/{model_provider}_*_prompts.json"
@@ -224,7 +241,7 @@ if __name__ == "__main__":
 
         print(f"🔍 Total number of prompts: {len(all_prompts)}")
         print(
-            f"🔍 Average prompt length: {total_chars/len(all_prompts):.2f} chars"
+            f"🔍 Average prompt length: {total_chars / len(all_prompts):.2f} chars"
         )
 
         # Define batch size
@@ -241,40 +258,51 @@ if __name__ == "__main__":
                 batch_filenames = filenames[i : i + BATCH_SIZE]
 
                 print(
-                    f"\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
+                    "\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
                 )
-                print(f"🔍 Batch size: {len(batch_prompts)} prompts")
-                print(f"🔍 CUDA memory before batch:")
+                print("🔍 Batch size: {len(batch_prompts)} prompts")
+                print("🔍 CUDA memory before batch:")
                 print(
-                    f"Allocated: {torch.cuda.memory_allocated()/1024**2:.2f}MB"
+                    f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
                 )
 
-                try:
-                    out_data = sampler(
-                        input_strings=batch_prompts, total_generation_steps=100
-                    )
+                for i, (prompt, filename) in enumerate(
+                    zip(batch_prompts, batch_filenames)
+                ):
+                    try:
+                        if needle_focus:
+                            model.enable_needle_focus(
+                                find_sequence(
+                                    torch.tensor(
+                                        vocab.encode(prompt, out_type=int)
+                                    ),
+                                    needle_ids,
+                                ),
+                                needle_scaling,
+                            )
 
-                    # Debug output data
-                    print(f"🔍 Output data type: {type(out_data)}")
-                    print(f"🔍 Output data attributes: {dir(out_data)}")
-                    print(
-                        f"🔍 Number of outputs: {len(out_data.text) if hasattr(out_data, 'text') else 'No text attribute'}"
-                    )
+                        out_data = sampler(
+                            input_strings=prompt, total_generation_steps=100
+                        )
 
-                    # Save results for this batch
-                    for idx, (filename, out_string) in enumerate(
-                        zip(batch_filenames, out_data.text)
-                    ):
+                        # Debug output data
+                        print(f"🔍 Output data type: {type(out_data)}")
+                        print(f"🔍 Output data attributes: {dir(out_data)}")
                         print(
-                            f"🔍 Output {idx} length: {len(out_string) if out_string else 0} chars"
+                            f"🔍 Number of outputs: {len(out_data.text) if hasattr(out_data, 'text') else 'No text attribute'}"
+                        )
+                        out_string = out_data.text[0]
+                        # Save results for this batch
+                        print(
+                            f"🔍 Output length: {len(out_string) if out_string else 0} chars"
                         )
                         if not out_string or len(out_string.strip()) == 0:
                             print(f"⚠️ Empty output for prompt from {filename}")
                             print(
-                                f"🔍 Input prompt length: {len(batch_prompts[idx])} chars"
+                                f"🔍 Input prompt length: {len(prompt)} chars"
                             )
                             print(
-                                f"🔍 First 100 chars of input prompt: {batch_prompts[idx][:100]}"
+                                f"🔍 First 100 chars of input prompt: {prompt[:100]}"
                             )
                             continue
 
@@ -286,18 +314,20 @@ if __name__ == "__main__":
                         with open(save_path, "w") as f:
                             f.write(out_string)
                         print(f"✅ Saved prediction: {save_path}")
+                        model.disable_needle_focus()
 
-                    # Clear memory after each batch
-                    torch.cuda.empty_cache()
-                    print(f"🔍 CUDA memory after batch cleanup:")
-                    print(
-                        f"Allocated: {torch.cuda.memory_allocated()/1024**2:.2f}MB"
-                    )
-
-                except RuntimeError as e:
-                    print(f"🚨 Error processing batch {i//BATCH_SIZE + 1}!")
-                    print(f"Error details: {str(e)}")
-                    raise e
+                        # Clear memory after each batch
+                        torch.cuda.empty_cache()
+                        print("🔍 CUDA memory after batch cleanup:")
+                        print(
+                            f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
+                        )
+                    except RuntimeError as e:
+                        print(
+                            f"🚨 Error processing batch {i // BATCH_SIZE + 1}!"
+                        )
+                        print(f"Error details: {str(e)}")
+                        raise e
 
         print("🎉 All predictions completed successfully!")
 
