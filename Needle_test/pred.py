@@ -4,9 +4,8 @@ import os
 import glob
 import json
 import torch
-
-import traceback
 import sys
+
 
 import sentencepiece as spm
 from recurrentgemma import torch as recurrentgemma
@@ -18,6 +17,8 @@ sys.path.append(".")
 
 
 def find_sequence(inputs, needle):
+    print(needle)
+    print(inputs)
     needle_len = needle.size(0)
     input_len = inputs.size(0)
     for i in range(input_len - needle_len + 1):
@@ -38,9 +39,7 @@ if __name__ == "__main__":
         model_name = config["model"]["model_name"]
         prompt_dir = config["prompt_dir"]
         save_dir = config["save_dir"]
-        k_indeces = config["sparsification"]["k"]
-        sparse_metric = config["sparsification"]["metric"]
-        sparse_prefill = config["sparsification"]["prefill"]
+        k_indeces = config["k"]
         needle_focus = config["needle"]["focus"]
         needle_scaling = config["needle"]["scaling"]
         needle_str = config["needle"]["needle"]
@@ -55,7 +54,9 @@ if __name__ == "__main__":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Load parameters
-        params = torch.load(config["kaggle_model_path"])
+        params = torch.load(
+            "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
+        )
         params = {
             k: v.to(device=device, dtype=torch.bfloat16)
             for k, v in params.items()
@@ -73,7 +74,7 @@ if __name__ == "__main__":
             "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
         )
         if needle_focus:
-            needle_ids = torch.tensor(vocab.encode(needle_str, out_type=int))
+            needle_ids = vocab.encode(needle_str, out_type=int)
 
         sampler = recurrentgemma.Sampler(model=model, vocab=vocab)
 
@@ -121,30 +122,24 @@ if __name__ == "__main__":
             k_save_dir = f"{save_dir}_K{k}"
             if not os.path.exists(k_save_dir):
                 os.makedirs(k_save_dir)
-            model.enable_sparsification(
-                k, metric=sparse_metric, prefill=sparse_prefill
-            )
+            model.enable_sparsification(k)
             # Process prompts in batches
             for i in range(0, len(all_prompts), BATCH_SIZE):
                 batch_prompts = all_prompts[i : i + BATCH_SIZE]
                 batch_filenames = filenames[i : i + BATCH_SIZE]
 
                 print(
-                    f"\n🔹 Processing batch {i // BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1) // BATCH_SIZE}"
+                    "\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
                 )
-                print(f"🔹 Processing {batch_filenames}")
+                print("🔍 Batch size: {len(batch_prompts)} prompts")
+                print("🔍 CUDA memory before batch:")
+                print(
+                    f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
+                )
 
                 for i, (prompt, filename) in enumerate(
                     zip(batch_prompts, batch_filenames)
                 ):
-                    print(f"🔍 Input size: {len(prompt)} characters")
-                    print(
-                        f"🔍 Input size: {len(vocab.encode(prompt, out_type=int))} tokens"
-                    )
-                    print("🔍 CUDA memory before batch:")
-                    print(
-                        f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
-                    )
                     try:
                         if needle_focus:
                             model.enable_needle_focus(
@@ -156,11 +151,9 @@ if __name__ == "__main__":
                                 ),
                                 needle_scaling,
                             )
-                        in_strings = [prompt]
-                        print(in_strings)
+
                         out_data = sampler(
-                            input_strings=in_strings,
-                            total_generation_steps=100,
+                            input_strings=prompt, total_generation_steps=100
                         )
 
                         # Debug output data
@@ -213,5 +206,4 @@ if __name__ == "__main__":
         print(f"🚨 Fatal error in script: {e}")
         print(f"Error type: {type(e)}")
         print(f"Error details: {str(e)}")
-        traceback.print_exc()
         exit(1)
