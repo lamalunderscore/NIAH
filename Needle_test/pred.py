@@ -3,20 +3,10 @@ import yaml
 import os
 import glob
 import json
-import time
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-import inspect
-import json
-import torch
-from typing import Optional, Union, Tuple
 
 import traceback
 import sys
-
-import pathlib
-import torch
 
 import sentencepiece as spm
 from recurrentgemma import torch as recurrentgemma
@@ -34,121 +24,6 @@ def find_sequence(inputs, needle):
         if torch.equal(inputs[i : i + needle_len], needle):
             return [pos for pos in range(i, i + needle_len)]
     return None
-
-
-def pred(
-    model_name,
-    model,
-    tokenizer,
-    input_data,
-    device,
-    max_new_tokens=1024,
-    temperature=0.1,
-):
-    try:
-        print("🔹 Running prediction...")
-        prompt = (
-            input_data["content"][0]["content"]
-            + "\n"
-            + input_data["content"][1]["content"]
-        )
-        # # Extract prompt consistently
-        # if isinstance(input_data, list) and len(input_data) >= 2:
-        #     prompt = input_data[0]['content'] + '\n' + input_data[1]['content']
-        # elif isinstance(input_data, dict) and 'needle' in input_data:
-        #     prompt = input_data['needle']
-        # else:
-        #     print("🚨 Error: Unrecognized input format")
-        #     return ""
-
-        print(f"🔹 Using prompt: {prompt[:100]}...")
-
-        # Basic tokenization - keep it simple
-        inputs = tokenizer(prompt, truncation=False, return_tensors="pt").to(
-            device
-        )
-        context_length = inputs.input_ids.shape[-1]
-
-        # Use same generation call for all models
-        output = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            num_beams=1,
-            temperature=temperature,
-        )[0]
-
-        pred = tokenizer.decode(
-            output[context_length:], skip_special_tokens=True
-        )
-        return pred.strip()
-
-    except Exception as e:
-        print(f"🚨 Error in prediction: {e}")
-        print("🔍 Full traceback:")
-        traceback.print_exc()  # This prints the full traceback
-        return ""
-
-
-def load_model_and_tokenizer(path, device):
-    try:
-        print(f"🔹 Loading model from {path}...")
-        valid_path = path.lower()
-        print(f"🔹 Checking model path: {valid_path}")
-
-        if "longchat" in valid_path or "vicuna" in valid_path:
-            from fastchat.model import load_model
-
-            model, _ = load_model(
-                path,
-                device="cpu",
-                num_gpus=0,
-                load_8bit=False,
-                cpu_offloading=False,
-                debug=False,
-            )
-            model = model.to(device)
-            model = model.bfloat16()
-            tokenizer = AutoTokenizer.from_pretrained(
-                path, trust_remote_code=True, use_fast=False
-            )
-        elif "mistral" in valid_path or "mixtral" in valid_path:
-            tokenizer = AutoTokenizer.from_pretrained(
-                path, trust_remote_code=True
-            )
-            model = AutoModelForCausalLM.from_pretrained(
-                path,
-                use_flash_attention_2=True,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-            )
-            model.generation_config = GenerationConfig.from_pretrained(path)
-        elif "recurrent_gemma" in valid_path:
-            print(
-                "🔹 Detected RecurrentGemma model, loading with custom logic..."
-            )
-            model = RecurrentGemmaForCausalLM.from_pretrained(path)
-            model.to(device)
-            tokenizer = AutoTokenizer.from_pretrained(
-                path, trust_remote_code=True
-            )
-            print("✅ RecurrentGemma model loaded successfully!")
-        else:
-            tokenizer = AutoTokenizer.from_pretrained(
-                path, trust_remote_code=True
-            )
-            model = AutoModelForCausalLM.from_pretrained(
-                path,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-            )
-        model = model.eval()
-        print("✅ Model and tokenizer loaded successfully!")
-        return model, tokenizer
-    except Exception as e:
-        print(f"🚨 Error loading model: {e}")
-        exit(1)
 
 
 if __name__ == "__main__":
@@ -180,9 +55,7 @@ if __name__ == "__main__":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Load parameters
-        params = torch.load(
-            "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
-        )
+        params = torch.load(config["kaggle_model_path"])
         params = {
             k: v.to(device=device, dtype=torch.bfloat16)
             for k, v in params.items()
@@ -257,7 +130,7 @@ if __name__ == "__main__":
                 batch_filenames = filenames[i : i + BATCH_SIZE]
 
                 print(
-                    f"\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
+                    f"\n🔹 Processing batch {i // BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1) // BATCH_SIZE}"
                 )
                 print(f"🔹 Processing {batch_filenames}")
 

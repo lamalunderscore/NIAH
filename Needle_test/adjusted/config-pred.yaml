@@ -1,5 +1,6 @@
 #configpred.yaml
 prompt_dir: 'LongAlign/Needle_test/prompts'
+kaggle_model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
 save_dir: 'LongAlign/Needle_test/pred'
 sparsification:
   sparsify: True
