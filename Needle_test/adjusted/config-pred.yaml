@@ -1,7 +1,11 @@
 #configpred.yaml
 prompt_dir: 'LongAlign/Needle_test/prompts'
 save_dir: 'LongAlign/Needle_test/pred'
-k: [2]
+sparsification:
+  sparsify: True
+  k: [10]
+  metric: "l2"
+  prefill: True
 model:
   model_provider: "Huggingface"  # "OpenAI", "Anthropic" or "Huggingface"
   model_name: "models/recurrent_gemma_default"
