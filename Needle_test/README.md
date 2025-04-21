@@ -1,6 +1,8 @@
 ## Needle Test Evaluation
 
-**We reconstructed the original "Needle In A Haystack - Pressure Test" [code](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) to add support for evaluating HuggingFace models. The evaluation procedure involves 3 steps: *Test prompt generation*, *model predicting*, and *scoring*.**
+**Reconstruction of the original "Needle In A Haystack - Pressure Test" [code](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) to add support for evaluating HuggingFace models. The evaluation procedure involves 3 steps: *Test prompt generation*, *model predicting*, and *scoring*.**
+
+It is assumed that the config files are in the same directory as the corresponding scripts.
 
 ### Test prompt generation
 
@@ -12,7 +14,7 @@ The test prompts will be generated under `prompts/`.
 
 ### Model predicting
 
-Set your model path (or HuggingFace path) in `config-pred.yaml`, then run
+Set your model details (Kaggle implementation) in `config-pred.yaml`, then run
 ```bash
 CUDA_VISIBLE_DEVICES=0 python pred.py
 ```
@@ -30,3 +32,4 @@ Finally, visualize your result with
 ```bash
 python vis.py
 ```
+This script assumes that the results directory is in the same directory as the script.
