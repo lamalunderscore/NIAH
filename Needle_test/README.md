@@ -10,11 +10,9 @@ python prompt.py
 ```
 The test prompts will be generated under `prompts/`.
 
-There is another file `pred.py`, which implements loading RecurrentGemma from Kaggle.
-
 ### Model predicting
 
-Set your model path (or HuggingFace path) in `config-pred.yaml`, then run
+Set your model details (Kaggle implementation) in `config-pred.yaml`, then run
 ```bash
 CUDA_VISIBLE_DEVICES=0 python pred.py
 ```
