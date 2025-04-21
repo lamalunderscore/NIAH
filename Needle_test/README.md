@@ -2,6 +2,8 @@
 
 **Reconstruction of the original "Needle In A Haystack - Pressure Test" [code](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) to add support for evaluating HuggingFace models. The evaluation procedure involves 3 steps: *Test prompt generation*, *model predicting*, and *scoring*.**
 
+It is assumed that the config files are in the same directory as the corresponding scripts.
+
 ### Test prompt generation
 
 Configure the test parameters in `config-prompt.yaml`, then run
