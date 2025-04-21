@@ -1,6 +1,6 @@
 ## Needle Test Evaluation
 
-**We reconstructed the original "Needle In A Haystack - Pressure Test" [code](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) to add support for evaluating HuggingFace models. The evaluation procedure involves 3 steps: *Test prompt generation*, *model predicting*, and *scoring*.**
+**Reconstruction of the original "Needle In A Haystack - Pressure Test" [code](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) to add support for evaluating HuggingFace models. The evaluation procedure involves 3 steps: *Test prompt generation*, *model predicting*, and *scoring*.**
 
 ### Test prompt generation
 
@@ -9,6 +9,8 @@ Configure the test parameters in `config-prompt.yaml`, then run
 python prompt.py
 ```
 The test prompts will be generated under `prompts/`.
+
+There is another file `pred.py`, which implements loading RecurrentGemma from Kaggle.
 
 ### Model predicting
 
