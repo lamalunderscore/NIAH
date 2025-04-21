@@ -5,15 +5,16 @@ import glob
 import json
 import torch
 import sys
+from pathlib import Path
 
 
 import sentencepiece as spm
 from recurrentgemma import torch as recurrentgemma
 
-# import recurrentgemma
-
 # If python does not find recurrent_gemma, add to correct directory to path:
 sys.path.append(".")
+
+CONF_FILE = "config-prompt.yaml"
 
 
 def find_sequence(inputs, needle):
@@ -30,9 +31,8 @@ def find_sequence(inputs, needle):
 if __name__ == "__main__":
     try:
         print("🔹 Loading configuration...")
-        with open(
-            "/content/LongAlign/Needle_test/config-pred.yaml", "r"
-        ) as file:
+        config_path = Path(__file__).resolve().parent / CONF_FILE
+        with open(config_path) as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
 
         model_provider = config["model"]["model_provider"]
@@ -47,9 +47,6 @@ if __name__ == "__main__":
         print(f"🔹 Prompt directory (relative): {prompt_dir}")
         print(f"🔹 Prompt directory (absolute): {os.path.abspath(prompt_dir)}")
         print(f"🔹 Model provider: {model_provider}")
-
-        # if not os.path.exists(save_dir):
-        #     os.makedirs(save_dir)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
