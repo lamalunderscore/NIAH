@@ -32,3 +32,4 @@ Finally, visualize your result with
 ```bash
 python vis.py
 ```
+This script assumes that the results directory is in the same directory as the script.
