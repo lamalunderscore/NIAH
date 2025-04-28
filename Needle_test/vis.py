@@ -6,20 +6,23 @@ import json
 import os
 import glob
 from pathlib import Path
+import yaml
 
-RES_FILES = "results/*.json"
-
-VIS_DIR = "vis"
+CONF_FILE = "config.yaml"
 
 if __name__ == "__main__":
-    script_path = Path(__file__).resolve().parent
-    results_glob = script_path / RES_FILES
-    vis_path = script_path / VIS_DIR
+    config_path = Path(__file__).resolve().parent() / CONF_FILE
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
 
-    json_files = glob.glob(results_glob)
+    parent_dir = config["parent_dir"]
+    results_glob = parent_dir + config["eval"]["save_dir"] / "*.json"
+    vis_path = parent_dir + config["vis"]["save_dir"]
+
+    result_files = glob.glob(results_glob)
     os.makedirs(vis_path, exist_ok=True)
 
-    for file in json_files:
+    for file in result_files:
         data = []
 
         with open(file, "r") as f:

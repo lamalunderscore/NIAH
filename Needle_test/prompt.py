@@ -11,7 +11,7 @@ from asyncio import Semaphore
 from transformers import AutoTokenizer
 from pathlib import Path
 
-CONF_FILE = "config-prompt.py"  # name of the config file
+CONF_FILE = "config.yaml"
 
 load_dotenv()
 
@@ -153,6 +153,7 @@ class Prompter:
                     use_fast=True,
                     local_files_only=is_local,
                     trust_remote_code=True,
+                    device_map="auto",
                 )
             else:
                 self.enc = AutoTokenizer.from_pretrained(
@@ -160,6 +161,7 @@ class Prompter:
                     trust_remote_code=True,
                     use_fast=False,
                     local_files_only=is_local,
+                    device_map="auto",
                 )
             print("✅ HuggingFace tokenizer initialized successfully")
         except Exception as e:
@@ -410,30 +412,37 @@ if __name__ == "__main__":
             config = yaml.safe_load(file)
 
         print("🔧 Creating Prompter instance...")
+        parent_dir = config["parent_dir"]
         ht = Prompter(
+            save_dir=parent_dir / config["prompt"]["save_dir"],
+            haystack_dir=parent_dir / config["prompt"]["haystack_dir"],
             needle=config["prompt"]["needle"],
-            haystack_dir=config["prompt"][
-                "haystack_dir"
-            ],  # Fix: Access haystack_dir from prompt config
             retrieval_question=config["prompt"]["retrieval_question"],
-            context_lengths_min=config["context"]["min_len"],
-            context_lengths_max=config["context"]["max_len"],
-            context_lengths_num_intervals=config["context"]["interval"],
-            context_lengths=config["context"]["manually_select_list"],
-            document_depth_percent_min=config["document_depth"]["min_percent"],
-            document_depth_percent_max=config["document_depth"]["max_percent"],
-            document_depth_percent_intervals=config["document_depth"][
+            context_lengths_min=config["prompt"]["context"]["min_len"],
+            context_lengths_max=config["prompt"]["context"]["max_len"],
+            context_lengths_num_intervals=config["prompt"]["context"][
                 "interval"
             ],
-            document_depth_percents=config["document_depth"][
+            context_lengths=config["prompt"]["context"][
                 "manually_select_list"
             ],
-            document_depth_percent_interval_type=config["document_depth"][
-                "interval_type"
+            document_depth_percent_min=config["prompt"]["document_depth"][
+                "min_percent"
             ],
-            tokenizer_type=config["tokenizer"]["tokenizer_type"],
-            model_name=config["tokenizer"]["model_name"],
-            save_dir=config["save_dir"],
+            document_depth_percent_max=config["prompt"]["document_depth"][
+                "max_percent"
+            ],
+            document_depth_percent_intervals=config["prompt"][
+                "document_depth"
+            ]["interval"],
+            document_depth_percents=config["prompt"]["document_depth"][
+                "manually_select_list"
+            ],
+            document_depth_percent_interval_type=config["prompt"][
+                "document_depth"
+            ]["interval_type"],
+            tokenizer_type=config["prompt"]["tokenizer"]["tokenizer_type"],
+            model_name=config["prompt"]["tokenizer"]["model_name"],
         )
 
         ht.start_test()

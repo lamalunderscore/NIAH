@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-CONF_FILE = "config-eval.yaml"
+CONF_FILE = "config.yaml"
 
 
 def clean_text(text):
@@ -90,10 +90,11 @@ if __name__ == "__main__":
     # Load configuration
     config_path = Path(__file__).resolve().parent / CONF_FILE
     with open(config_path, "r") as file:
-        config = yaml.load(file, Loader=yaml.FullLoader)
+        config = yaml.safe_load(file)
 
-    pred_base_dir = config["pred_dir"]  # Base directory path without K suffix
-    save_dir = config["save_dir"]
+    parent_dir = Path(config["parent_dir"])
+    pred_base_dir = parent_dir / config["pred"]["save_dir"]
+    save_dir = parent_dir / config["eval"]["save_dir"]
     reference = config["prompt"]["needle"]
 
     # Ensure save directory exists

@@ -14,7 +14,7 @@ from recurrentgemma import torch as recurrentgemma
 # If python does not find recurrent_gemma, add to correct directory to path:
 sys.path.append(".")
 
-CONF_FILE = "config-prompt.yaml"
+CONF_FILE = "config.yaml"
 
 
 def find_sequence(inputs, needle):
@@ -30,30 +30,38 @@ def find_sequence(inputs, needle):
 
 if __name__ == "__main__":
     try:
-        print("🔹 Loading configuration...")
         config_path = Path(__file__).resolve().parent / CONF_FILE
-        with open(config_path) as file:
-            config = yaml.load(file, Loader=yaml.FullLoader)
+        with open(config_path, "r") as file:
+            config = yaml.safe_load(file)
+        parent_dir = Path(config["parent_dir"])
+        prompt_dir = parent_dir / config["prompt"]["save_dir"]
+        save_dir = parent_dir / config["pred"]["save_dir"]
 
-        model_provider = config["model"]["model_provider"]
-        model_name = config["model"]["model_name"]
-        prompt_dir = config["prompt_dir"]
-        save_dir = config["save_dir"]
-        k_indeces = config["k"]
-        needle_focus = config["needle"]["focus"]
-        needle_scaling = config["needle"]["scaling"]
-        needle_str = config["needle"]["needle"]
+        tokenizer_type = config["prompt"]["tokenizer"]["tokenizer_type"]
+        model_path = config["pred"]["model_path"]
+
+        k_indeces = config["pred"]["sparsification"]["k"]
+        metric = config["pred"]["sparsification"]["metric"]
+        prefill = config["pred"]["sparsification"]["prefill"]
+
+        needle_focus = config.get("needle_focus")  # not implemented
+        needle_str = config.get("needle_str")  # not implemented
+        needle_scaling = config.get("needle_scaling")  # not implemented
 
         print(f"🔹 Prompt directory (relative): {prompt_dir}")
         print(f"🔹 Prompt directory (absolute): {os.path.abspath(prompt_dir)}")
-        print(f"🔹 Model provider: {model_provider}")
+        print(f"🔹 Tokenizer provider: {tokenizer_type}")
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+
+        print(f"Running on device '{device}'")
 
         # Load parameters
-        params = torch.load(
-            "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
-        )
+        params = torch.load(model_path)
         params = {
             k: v.to(device=device, dtype=torch.bfloat16)
             for k, v in params.items()
@@ -75,7 +83,7 @@ if __name__ == "__main__":
 
         sampler = recurrentgemma.Sampler(model=model, vocab=vocab)
 
-        pattern = f"{prompt_dir}/{model_provider}_*_prompts.json"
+        pattern = f"{prompt_dir}/{tokenizer_type}_*_prompts.json"
         print(f"🔹 Looking for prompt files matching pattern: {pattern}")
         prompt_files = glob.glob(pattern)
         print(f"🔹 Found {len(prompt_files)} matching files")
@@ -119,7 +127,7 @@ if __name__ == "__main__":
             k_save_dir = f"{save_dir}_K{k}"
             if not os.path.exists(k_save_dir):
                 os.makedirs(k_save_dir)
-            model.enable_sparsification(k)
+            model.enable_sparsification(k=k, metric=metric, prefill=prefill)
             # Process prompts in batches
             for i in range(0, len(all_prompts), BATCH_SIZE):
                 batch_prompts = all_prompts[i : i + BATCH_SIZE]
