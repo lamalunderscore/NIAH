@@ -150,7 +150,7 @@ if __name__ == "__main__":
                 print("🔍 Batch size: {len(batch_prompts)} prompts")
                 print("🔍 Memory before batch:")
                 print(
-                    f"Allocated: {backend["allocated_memory"]() / 1024**2:.2f}MB"
+                    f"Allocated: {backend['allocated_memory']() / 1024**2:.2f}MB"
                 )
 
                 for i, (prompt, filename) in enumerate(
@@ -207,7 +207,7 @@ if __name__ == "__main__":
                         backend["empty_cache"]()
                         print("🔍 CUDA memory after batch cleanup:")
                         print(
-                            f"Allocated: {backend["allocated_memory"]() / 1024**2:.2f}MB"
+                            f"Allocated: {backend['allocated_memory']() / 1024**2:.2f}MB"
                         )
                     except RuntimeError as e:
                         print(
