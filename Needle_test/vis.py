@@ -17,9 +17,10 @@ if __name__ == "__main__":
 
     parent_dir = Path(config["parent_dir"])
     results_glob = parent_dir / config["eval"]["save_dir"] / "*.json"
+    print(results_glob)
     vis_path = parent_dir / config["vis"]["save_dir"]
 
-    result_files = glob.glob(results_glob)
+    result_files = glob.glob(str(results_glob))
     os.makedirs(vis_path, exist_ok=True)
 
     for file in result_files:
