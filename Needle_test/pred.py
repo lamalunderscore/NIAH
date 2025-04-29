@@ -39,6 +39,7 @@ if __name__ == "__main__":
 
         tokenizer_type = config["prompt"]["tokenizer"]["tokenizer_type"]
         model_path = config["pred"]["model_path"]
+        tokenizer_path = config["pred"]["tokenizer_path"]
 
         k_indeces = config["pred"]["sparsification"]["k"]
         metric = config["pred"]["sparsification"]["metric"]
@@ -75,9 +76,7 @@ if __name__ == "__main__":
         )
         model.load_state_dict(params)
         vocab = spm.SentencePieceProcessor()
-        vocab.Load(
-            "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
-        )
+        vocab.Load(tokenizer_path)
         if needle_focus:
             needle_ids = vocab.encode(needle_str, out_type=int)
 
