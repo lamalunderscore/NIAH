@@ -169,7 +169,7 @@ if __name__ == "__main__":
                             )
 
                         out_data = sampler(
-                            input_strings=prompt, total_generation_steps=100
+                            input_strings=[prompt], total_generation_steps=100
                         )
 
                         # Debug output data
