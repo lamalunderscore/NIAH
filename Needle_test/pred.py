@@ -79,7 +79,11 @@ if __name__ == "__main__":
             k: v.to(device=device, dtype=torch.bfloat16)
             for k, v in params.items()
         }
-        preset = recurrentgemma.Preset.RECURRENT_GEMMA_2B_V1
+        preset = (
+            recurrentgemma.Preset.RECURRENT_GEMMA_2B_V1
+            if "2b" in os.path.basename(model_path)
+            else recurrentgemma.Preset.RECURRENT_GEMMA_9B_V1
+        )
         model_config = recurrentgemma.GriffinConfig.from_torch_params(
             params, preset=preset
         )

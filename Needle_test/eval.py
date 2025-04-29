@@ -128,14 +128,21 @@ if __name__ == "__main__":
 
     # Compute summary statistics
     summary_stats = compute_summary_statistics(results)
+    print(results)
 
     # Save detailed results
-    with open(os.path.join(save_dir, "binary_eval_all_k.json"), "w") as f:
-        json.dump(
-            {"detailed_results": results, "summary_statistics": summary_stats},
-            f,
-            indent=4,
-        )
+    for key in results:
+        with open(
+            os.path.join(save_dir, f"binary_eval_K{key[1:]}.json"), "w"
+        ) as f:
+            json.dump(
+                {
+                    "detailed_results": results[key],
+                    "summary_statistics": summary_stats[key],
+                },
+                f,
+                indent=4,
+            )
 
     # Print summary statistics
     print("\nEvaluation Summary:")

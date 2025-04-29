@@ -1,6 +1,6 @@
 parent_dir: "NIAH/Needle_test"
 prompt:
-  save_dir: 'prompts'
+  save_dir: "prompts"
   needle: "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n"
   haystack_dir: "PaulGrahamEssays"
   retrieval_question: "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:" # We use the Anthropic's retrieval question as the default one
@@ -19,7 +19,7 @@ prompt:
     tokenizer_type: "Huggingface" # "OpenAI", "Anthropic" or "Huggingface"
     model_name: "google/recurrentgemma-2b" # Change it to your own model name / HF model path
 pred:
-  save_dir: 'pred'
+  save_dir: "pred"
   sparsification:
     k: [10]
     metric: "entropy"
@@ -28,6 +28,6 @@ pred:
   model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
   model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
 eval:
-  save_dir: 'results'
+  save_dir: "results"
 vis:
-  save_dir: 'vis'
+  save_dir: "vis"
