@@ -11,7 +11,7 @@ import yaml
 CONF_FILE = "config.yaml"
 
 if __name__ == "__main__":
-    config_path = Path(__file__).resolve().parent() / CONF_FILE
+    config_path = Path(__file__).resolve().parent / CONF_FILE
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 

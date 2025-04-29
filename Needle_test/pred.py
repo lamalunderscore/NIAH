@@ -67,7 +67,7 @@ if __name__ == "__main__":
         elif torch.backends.mps.is_available():
             backend = dict(
                 allocated_memory=torch.mps.current_allocated_memory,
-                empy_cache=torch.mps.empty_cache,
+                empty_cache=torch.mps.empty_cache,
             )
             device = "mps"
 
