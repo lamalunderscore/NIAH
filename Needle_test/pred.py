@@ -54,9 +54,12 @@ if __name__ == "__main__":
         print(f"🔹 Tokenizer provider: {tokenizer_type}")
 
         device = "cpu"
+        backend = torch.cpu
         if torch.cuda.is_available():
+            backend = torch.cuda
             device = "cuda"
         elif torch.backends.mps.is_available():
+            backend = torch.backends.mps
             device = "mps"
 
         print(f"Running on device '{device}'")
@@ -133,12 +136,12 @@ if __name__ == "__main__":
                 batch_filenames = filenames[i : i + BATCH_SIZE]
 
                 print(
-                    "\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
+                    f"\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
                 )
                 print("🔍 Batch size: {len(batch_prompts)} prompts")
-                print("🔍 CUDA memory before batch:")
+                print("🔍 Memory before batch:")
                 print(
-                    f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
+                    f"Allocated: {backend.memory_allocated() / 1024**2:.2f}MB"
                 )
 
                 for i, (prompt, filename) in enumerate(
@@ -192,10 +195,10 @@ if __name__ == "__main__":
                         model.disable_needle_focus()
 
                         # Clear memory after each batch
-                        torch.cuda.empty_cache()
+                        backend.empty_cache()
                         print("🔍 CUDA memory after batch cleanup:")
                         print(
-                            f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f}MB"
+                            f"Allocated: {backend.memory_allocated() / 1024**2:.2f}MB"
                         )
                     except RuntimeError as e:
                         print(
