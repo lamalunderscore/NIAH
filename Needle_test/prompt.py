@@ -412,7 +412,7 @@ if __name__ == "__main__":
             config = yaml.safe_load(file)
 
         print("🔧 Creating Prompter instance...")
-        parent_dir = config["parent_dir"]
+        parent_dir = Path(config["parent_dir"])
         ht = Prompter(
             save_dir=parent_dir / config["prompt"]["save_dir"],
             haystack_dir=parent_dir / config["prompt"]["haystack_dir"],
