@@ -18,11 +18,9 @@ if __name__ == "__main__":
 
     parent_dir = Path(config["parent_dir"]).resolve()
     results_glob = parent_dir / config["eval"]["save_dir"] / "*.json"
-    print(results_glob)
     vis_path = parent_dir / config["vis"]["save_dir"]
 
     result_files = glob.glob(str(results_glob))
-    print(result_files)
     os.makedirs(vis_path, exist_ok=True)
 
     for file_path in result_files:
@@ -30,7 +28,6 @@ if __name__ == "__main__":
 
         with open(file_path, "r") as f:
             json_data = json.load(f)
-            print(json_data)
 
             for k, v in json_data["detailed_results"].items():
                 try:

@@ -128,7 +128,6 @@ if __name__ == "__main__":
 
     # Compute summary statistics
     summary_stats = compute_summary_statistics(results)
-    print(results)
 
     # Save detailed results
     for key in results:
