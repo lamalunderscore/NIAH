@@ -15,8 +15,8 @@ if __name__ == "__main__":
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    parent_dir = config["parent_dir"]
-    results_glob = parent_dir + config["eval"]["save_dir"] / "*.json"
+    parent_dir = Path(config["parent_dir"])
+    results_glob = parent_dir / config["eval"]["save_dir"] / "*.json"
     vis_path = parent_dir + config["vis"]["save_dir"]
 
     result_files = glob.glob(results_glob)
