@@ -26,6 +26,7 @@ pred:
     prefill: True
   # ckpt_path in notebook
   model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
+  tokenizer_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
 eval:
   save_dir: "results"
 vis:
