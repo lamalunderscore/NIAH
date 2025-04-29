@@ -406,6 +406,10 @@ class Prompter:
 
 if __name__ == "__main__":
     try:
+        if not os.environ.get("HF_TOKEN"):
+            print("no token found")
+        else:
+            print(f"found token {os.environ['HF_TOKEN']}")
         print("📝 Loading configuration...")
         config_path = Path(__file__).resolve().parent / CONF_FILE
         with open(config_path, "r") as file:
