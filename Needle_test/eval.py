@@ -1,8 +1,10 @@
-import yaml
-import os
 import json
+import os
 import re
 from pathlib import Path
+
+import yaml
+
 
 CONF_FILE = "config.yaml"
 
@@ -16,9 +18,11 @@ def clean_text(text):
 
 
 def evaluate_predictions(pred_base_dir, reference, k_values):
-    """
-    Evaluate predictions for each K value directory. This assumes that predictions are sorted
-        in directories of the format "{pred_base_dir}_K{k_values}".
+    """Evaluate predictions for each K value directory.
+
+    This assumes that predictions are sorted
+    in directories of the format "{pred_base_dir}_K{k_values}".
+
 
     Args:
         pred_base_dir (str): Base directory containing K-specific folders
@@ -27,6 +31,7 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
 
     Returns:
         dict: Results organized by K value
+
     """
     # Clean reference text once since it's used multiple times
     cleaned_reference = clean_text(reference)
@@ -36,7 +41,7 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
 
     # Process each K directory
     for k in k_values:
-        k_dir = f"{pred_base_dir}_K{k}"
+        k_dir = f"{pred_base_dir}/K{k}"
         if not os.path.exists(k_dir):
             print(f"Warning: Directory for K={k} not found at {k_dir}")
             continue
@@ -52,7 +57,24 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
                 prediction = f.read().strip()
 
             cleaned_prediction = clean_text(prediction)
-            score = 10 if cleaned_reference in cleaned_prediction else 0
+
+            score = 0
+            if "best thing to do in san francisco" in cleaned_prediction:
+                score += 1
+            if "eat a sandwich" in cleaned_prediction:
+                score += 1
+            if "dolores park" in cleaned_prediction:
+                score += 0.5
+                if "sit in dolores park" in cleaned_prediction:
+                    score += 0.5
+            if "on a sunny day" in cleaned_prediction:
+                score += 1
+            if cleaned_reference in cleaned_prediction:
+                score = 5
+
+            # if score == 0:
+            #     print(f"reference: {cleaned_reference}")
+            #     print(f"prediction: {half_prediction}")
 
             k_results[filename.replace(".txt", "")] = {
                 "prediction": prediction,
@@ -67,20 +89,17 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
 def compute_summary_statistics(results):
     summary_stats = {}
 
-    for k_value, k_results in results.items():
-        total_predictions = len(k_results)
-        successful_predictions = sum(
-            1 for pred in k_results.values() if pred["score"] == 10
+    for k_value, prompt_results in results.items():
+        total_predictions = len(prompt_results)
+        successful_predictions = sum(1 for pred in prompt_results.values() if pred["score"] == 5)
+        average_points = (
+            sum(pred["score"] for pred in prompt_results.values()) / total_predictions / 5
         )
 
         summary_stats[k_value] = {
             "total_predictions": total_predictions,
             "successful_predictions": successful_predictions,
-            "success_rate": (
-                successful_predictions / total_predictions
-                if total_predictions > 0
-                else 0
-            ),
+            "average_points": average_points,
         }
 
     return summary_stats
@@ -102,15 +121,11 @@ if __name__ == "__main__":
         os.makedirs(save_dir)
 
     # Get K values from directory names
-    k_pattern = re.compile(r"_K(\d+)$")
+    k_pattern = re.compile(r"K(\d+)$")
     k_values = []
 
-    # Search for K directories in the parent directory of pred_base_dir
-    parent_dir = os.path.dirname(pred_base_dir)
-    base_name = os.path.basename(pred_base_dir)
-
-    for dirname in os.listdir(parent_dir):
-        if dirname.startswith(base_name):
+    for dirname in os.listdir(pred_base_dir):
+        if dirname.startswith("K"):
             match = k_pattern.search(dirname)
             if match:
                 k_values.append(int(match.group(1)))
@@ -131,9 +146,7 @@ if __name__ == "__main__":
 
     # Save detailed results
     for key in results:
-        with open(
-            os.path.join(save_dir, f"binary_eval_K{key[1:]}.json"), "w"
-        ) as f:
+        with open(os.path.join(save_dir, f"binary_eval_K{key[1:]}.json"), "w") as f:
             json.dump(
                 {
                     "detailed_results": results[key],
@@ -149,4 +162,4 @@ if __name__ == "__main__":
         print(f"\n{k_value}:")
         print(f"  Total predictions: {stats['total_predictions']}")
         print(f"  Successful predictions: {stats['successful_predictions']}")
-        print(f"  Success rate: {stats['success_rate']*100:.2f}%")
+        print(f"  Success rate: {stats['average_points'] * 100:.2f}%")

@@ -1,13 +1,15 @@
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
+import glob
 import json
 import os
-import glob
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 import yaml
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+from matplotlib.patches import Patch
+
 
 CONF_FILE = "config.yaml"
 
@@ -64,30 +66,32 @@ if __name__ == "__main__":
 
         # Binary colormap: red for 0, green for 10
         binary_cmap = ListedColormap(["#F0496E", "#0CD79F"])
+        red_green = LinearSegmentedColormap.from_list("ReGn", ["#F0496E", "yellow", "#0CD79F"])
 
         plt.figure(figsize=(9.0, 8))
         ax = sns.heatmap(
             pivot_table,
             fmt="g",
-            cmap=binary_cmap,
-            cbar=False,  # Disable default colorbar
+            cmap=red_green,
+            cbar=True,
             vmin=0,
-            vmax=10,
+            vmax=5,
+            cbar_kws={
+                "label": "Score (0 = Bad, 5 = Good)",  # label for legend
+                "shrink": 0.8,  # adjust size if needed
+            },
         )
 
         # Custom binary legend
         legend_elements = [
-            Patch(
-                facecolor="#F0496E", edgecolor="black", label="Unsuccessful"
-            ),
+            Patch(facecolor="#F0496E", edgecolor="black", label="Unsuccessful"),
             Patch(facecolor="#0CD79F", edgecolor="black", label="Successful"),
         ]
-        ax.legend(
-            handles=legend_elements,
-            loc="upper right",
-            frameon=True,
-            fontsize="medium",
-        )
+        # ax.legend(
+        #     loc="upper right",
+        #     frameon=True,
+        #     fontsize="medium",
+        # )
         file_name_no_ext = os.path.splitext(os.path.basename(file_path))[0]
         k = file_name_no_ext.split("_")[2][1:]
         plt.title(f"Needle In A HayStack - K={k}", fontweight="bold")

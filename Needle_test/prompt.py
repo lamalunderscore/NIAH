@@ -1,17 +1,21 @@
-from dotenv import load_dotenv
-import os
-import tiktoken
+import asyncio
 import glob
 import json
-import yaml
-from anthropic import Anthropic
-import numpy as np
-import asyncio
+import os
 from asyncio import Semaphore
-from transformers import AutoTokenizer
 from pathlib import Path
 
+import numpy as np
+import tiktoken
+import yaml
+from anthropic import Anthropic
+from dotenv import load_dotenv
+from transformers import AutoTokenizer
+
+
 CONF_FILE = "config.yaml"
+
+BASE_MODEL_PROMPT_END = "Here is the most relevant sentence in the context: "
 
 load_dotenv()
 
@@ -37,13 +41,12 @@ class Prompter:
         final_context_length_buffer=200,
         save_dir="prompts",
         print_ongoing_status=True,
+        is_jrt: bool = False,
+        is_base: bool = True,
     ):
-
         print("🚀 Initializing Prompter...")
         if not all([needle, haystack_dir, retrieval_question]):
-            raise ValueError(
-                "Needle, haystack_dir, and retrieval_question must all be provided."
-            )
+            raise ValueError("Needle, haystack_dir, and retrieval_question must all be provided.")
 
         self.needle = needle
         self.haystack_dir = haystack_dir
@@ -55,6 +58,9 @@ class Prompter:
         self.model_name = model_name
         self.testing_results = []
         self.save_dir = save_dir
+
+        self.is_jrt = is_jrt
+        self.is_base = is_base
 
         print(f"📁 Haystack directory: {self.haystack_dir}")
         print(f"💾 Save directory: {self.save_dir}")
@@ -75,15 +81,11 @@ class Prompter:
         self._initialize_tokenizer()
         print("✅ Initialization complete\n")
 
-    def _setup_context_lengths(
-        self, context_lengths, min_len, max_len, num_intervals
-    ):
+    def _setup_context_lengths(self, context_lengths, min_len, max_len, num_intervals):
         print("⚙️ Setting up context lengths...")
         if context_lengths is None:
             if any(x is None for x in [min_len, max_len, num_intervals]):
-                raise ValueError(
-                    "Either provide context_lengths list or all required parameters"
-                )
+                raise ValueError("Either provide context_lengths list or all required parameters")
             self.context_lengths = np.round(
                 np.linspace(min_len, max_len, num=num_intervals, endpoint=True)
             ).astype(int)
@@ -103,14 +105,11 @@ class Prompter:
         if depth_percents is None:
             if interval_type == "linear":
                 self.document_depth_percents = np.round(
-                    np.linspace(
-                        min_percent, max_percent, num=intervals, endpoint=True
-                    )
+                    np.linspace(min_percent, max_percent, num=intervals, endpoint=True)
                 ).astype(int)
             elif interval_type == "sigmoid":
                 self.document_depth_percents = [
-                    self.logistic(x)
-                    for x in np.linspace(min_percent, max_percent, intervals)
+                    self.logistic(x) for x in np.linspace(min_percent, max_percent, intervals)
                 ]
             else:
                 raise ValueError("Invalid interval_type")
@@ -128,9 +127,7 @@ class Prompter:
             elif self.tokenizer_type == "Huggingface":
                 self._initialize_huggingface_tokenizer()
             else:
-                raise ValueError(
-                    f"Unsupported tokenizer_type: {self.tokenizer_type}"
-                )
+                raise ValueError(f"Unsupported tokenizer_type: {self.tokenizer_type}")
             print("✅ Tokenizer initialized successfully")
         except Exception as e:
             print(f"❌ Tokenizer initialization failed: {str(e)}")
@@ -142,9 +139,7 @@ class Prompter:
         if is_local:
             print(f"📂 Loading local tokenizer from {self.model_name}")
         else:
-            print(
-                f"🌐 Loading tokenizer from HuggingFace Hub: {self.model_name}"
-            )
+            print(f"🌐 Loading tokenizer from HuggingFace Hub: {self.model_name}")
 
         try:
             if "gemma" in self.model_name.lower():
@@ -200,9 +195,7 @@ class Prompter:
             elif self.tokenizer_type == "Anthropic":
                 return self.enc.decode(tokens[:context_length])
             elif self.tokenizer_type == "Huggingface":
-                return self.enc.decode(
-                    tokens[:context_length], skip_special_tokens=True
-                )
+                return self.enc.decode(tokens[:context_length], skip_special_tokens=True)
         except Exception as e:
             print(f"❌ Token decoding failed: {str(e)}")
             raise
@@ -214,36 +207,25 @@ class Prompter:
             tokens_context = self.encode_text_to_tokens(context)
 
             context_length -= self.final_context_length_buffer
-            print(
-                f"📊 Context tokens: {len(tokens_context)}, Needle tokens: {len(tokens_needle)}"
-            )
+            print(f"📊 Context tokens: {len(tokens_context)}, Needle tokens: {len(tokens_needle)}")
 
             if len(tokens_context) + len(tokens_needle) > context_length:
-                tokens_context = tokens_context[
-                    : context_length - len(tokens_needle)
-                ]
+                tokens_context = tokens_context[: context_length - len(tokens_needle)]
                 print("✂️ Trimmed context to fit needle")
 
             if depth_percent == 100:
                 tokens_new_context = tokens_context + tokens_needle
                 print("📌 Needle inserted at end")
             else:
-                insertion_point = int(
-                    len(tokens_context) * (depth_percent / 100)
-                )
+                insertion_point = int(len(tokens_context) * (depth_percent / 100))
                 tokens_new_context = tokens_context[:insertion_point]
 
                 period_tokens = self.encode_text_to_tokens(".")
-                while (
-                    tokens_new_context
-                    and tokens_new_context[-1] not in period_tokens
-                ):
+                while tokens_new_context and tokens_new_context[-1] not in period_tokens:
                     insertion_point -= 1
                     tokens_new_context = tokens_context[:insertion_point]
 
-                tokens_new_context += (
-                    tokens_needle + tokens_context[insertion_point:]
-                )
+                tokens_new_context += tokens_needle + tokens_context[insertion_point:]
                 print(f"📌 Needle inserted at position {insertion_point}")
 
             result = self.decode_tokens(tokens_new_context)
@@ -260,9 +242,7 @@ class Prompter:
             elif self.tokenizer_type == "Anthropic":
                 return len(self.enc.encode(context).ids)
             elif self.tokenizer_type == "Huggingface":
-                return self.enc(
-                    context, truncation=False, return_tensors="pt"
-                ).input_ids.shape[-1]
+                return self.enc(context, truncation=False, return_tensors="pt").input_ids.shape[-1]
         except Exception as e:
             print(f"❌ Context length calculation failed: {str(e)}")
             raise
@@ -276,15 +256,11 @@ class Prompter:
         try:
             file_list = glob.glob(f"{self.haystack_dir}/*.txt")
             if not file_list:
-                raise FileNotFoundError(
-                    f"No .txt files found in {self.haystack_dir}"
-                )
+                raise FileNotFoundError(f"No .txt files found in {self.haystack_dir}")
 
             print(f"📁 Found {len(file_list)} files")
 
-            while (
-                self.get_context_length_in_tokens(context) < max_context_length
-            ):
+            while self.get_context_length_in_tokens(context) < max_context_length:
                 for file in file_list:
                     print(f"📄 Reading: {os.path.basename(file)}")
                     with open(file, "r") as f:
@@ -303,9 +279,7 @@ class Prompter:
             tokens = self.encode_text_to_tokens(context)
             if len(tokens) > context_length:
                 context = self.decode_tokens(tokens, context_length)
-                print(
-                    f"✅ Trimmed from {len(tokens)} to {context_length} tokens"
-                )
+                print(f"✅ Trimmed from {len(tokens)} to {context_length} tokens")
             return context
         except Exception as e:
             print(f"❌ Trimming failed: {str(e)}")
@@ -316,32 +290,32 @@ class Prompter:
             await self.evaluate_and_log(*args)
 
     async def evaluate_and_log(self, context_length, depth_percent):
-        print(
-            f"\n📋 Processing: length={context_length}, depth={depth_percent}%"
-        )
+        print(f"\n📋 Processing: length={context_length}, depth={depth_percent}%")
         try:
-            context = await self.generate_context(
-                context_length, depth_percent
-            )
+            context = await self.generate_context(context_length, depth_percent)
             print(f"✅ Context generated: {len(context)} chars")
 
-            prompt = {
+            prompt = f"CONTEXT: {context}\n\nQUESTION: {self.retrieval_question}"
+            if self.is_jrt:
+                prompt += f"\n\n{prompt}"
+            if self.is_base:
+                prompt += f"\n\nANSWER: {BASE_MODEL_PROMPT_END}"
+            else:
+                prompt = [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ]
+
+            prompt_dict = {
                 "model": self.model_name,
                 "tokenizer": self.tokenizer_type,
                 "context_length": int(context_length),
                 "depth_percent": int(depth_percent),
                 "needle": self.needle,
                 "retrieval_question": self.retrieval_question,
-                "content": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant.",
-                    },
-                    {
-                        "role": "user",
-                        "content": f"{context}\n\n{self.retrieval_question}",
-                    },
-                ],
+                "content": prompt,
             }
 
             filename = f"{self.tokenizer_type}_{context_length}_{depth_percent}_prompts.json"
@@ -349,7 +323,7 @@ class Prompter:
 
             print(f"💾 Saving to: {save_path}")
             with open(save_path, "w") as f:
-                json.dump(prompt, f, indent=2)
+                json.dump(prompt_dict, f, indent=2)
             print("✅ Save complete\n")
 
         except Exception as e:
@@ -375,9 +349,7 @@ class Prompter:
 
         for context_length in self.context_lengths:
             for depth_percent in self.document_depth_percents:
-                task = self.bound_evaluate_and_log(
-                    sem, context_length, depth_percent
-                )
+                task = self.bound_evaluate_and_log(sem, context_length, depth_percent)
                 tasks.append(task)
 
         print(f"📊 Created {len(tasks)} tasks")
@@ -420,29 +392,19 @@ if __name__ == "__main__":
             retrieval_question=config["prompt"]["retrieval_question"],
             context_lengths_min=config["prompt"]["context"]["min_len"],
             context_lengths_max=config["prompt"]["context"]["max_len"],
-            context_lengths_num_intervals=config["prompt"]["context"][
-                "interval"
+            context_lengths_num_intervals=config["prompt"]["context"]["interval"],
+            context_lengths=config["prompt"]["context"]["manually_select_list"],
+            document_depth_percent_min=config["prompt"]["document_depth"]["min_percent"],
+            document_depth_percent_max=config["prompt"]["document_depth"]["max_percent"],
+            document_depth_percent_intervals=config["prompt"]["document_depth"]["interval"],
+            document_depth_percents=config["prompt"]["document_depth"]["manually_select_list"],
+            document_depth_percent_interval_type=config["prompt"]["document_depth"][
+                "interval_type"
             ],
-            context_lengths=config["prompt"]["context"][
-                "manually_select_list"
-            ],
-            document_depth_percent_min=config["prompt"]["document_depth"][
-                "min_percent"
-            ],
-            document_depth_percent_max=config["prompt"]["document_depth"][
-                "max_percent"
-            ],
-            document_depth_percent_intervals=config["prompt"][
-                "document_depth"
-            ]["interval"],
-            document_depth_percents=config["prompt"]["document_depth"][
-                "manually_select_list"
-            ],
-            document_depth_percent_interval_type=config["prompt"][
-                "document_depth"
-            ]["interval_type"],
             tokenizer_type=config["prompt"]["tokenizer"]["tokenizer_type"],
             model_name=config["prompt"]["tokenizer"]["model_name"],
+            is_jrt=config["prompt"]["is_jrt"],
+            is_base=config["prompt"]["is_base"],
         )
 
         ht.start_test()

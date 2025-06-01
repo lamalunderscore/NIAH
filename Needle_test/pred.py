@@ -1,20 +1,29 @@
 # pred.py
-import yaml
-import os
 import glob
 import json
-import torch
+import os
 import sys
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-
+from typing import Callable, Dict
 
 import sentencepiece as spm
+import torch
+import yaml
+from accelerate import (
+    infer_auto_device_map,
+    load_checkpoint_and_dispatch,
+)
+from accelerate.utils import get_balanced_memory
 from recurrentgemma import torch as recurrentgemma
+
 
 # If python does not find recurrent_gemma, add to correct directory to path:
 sys.path.append(".")
 
 CONF_FILE = "config.yaml"
+BATCH_SIZE = 2
 
 
 def find_sequence(inputs, needle):
@@ -28,7 +37,14 @@ def find_sequence(inputs, needle):
     return None
 
 
+@dataclass
+class BackEnd:
+    allocated_memory: Callable[[], Dict[str, float]]
+    empty_cache: Callable[[], None]
+
+
 if __name__ == "__main__":
+    print(f"visible devices: {os.getenv('CUDA_VISIBLE_DEVICES')}")
     try:
         config_path = Path(__file__).resolve().parent / CONF_FILE
         with open(config_path, "r") as file:
@@ -54,19 +70,22 @@ if __name__ == "__main__":
         print(f"🔹 Tokenizer provider: {tokenizer_type}")
 
         device = "cpu"
-        backend = dict(
+        backend = BackEnd(
             allocated_memory=lambda: 0,
-            empy_cache=lambda: 0,
+            empty_cache=lambda: None,
         )
         if torch.cuda.is_available():
-            backend = dict(
-                allocated_memory=torch.cuda.memory_allocated,
-                empy_cache=torch.cuda.empty_cache,
+            backend = BackEnd(
+                allocated_memory=lambda: {
+                    str(i): torch.cuda.memory_allocated(torch.device(f"cuda:{i}")) / 1024**2
+                    for i in range(torch.cuda.device_count())
+                },
+                empty_cache=torch.cuda.empty_cache,
             )
             device = "cuda"
         elif torch.backends.mps.is_available():
-            backend = dict(
-                allocated_memory=torch.mps.current_allocated_memory,
+            backend = BackEnd(
+                allocated_memory={"1": torch.mps.current_allocated_memory() / 1024**2},
                 empty_cache=torch.mps.empty_cache,
             )
             device = "mps"
@@ -74,27 +93,53 @@ if __name__ == "__main__":
         print(f"Running on device '{device}'")
 
         # Load parameters
+
         params = torch.load(model_path)
-        params = {
-            k: v.to(device=device, dtype=torch.bfloat16)
-            for k, v in params.items()
-        }
+        params = {k: v.to(device=device, dtype=torch.bfloat16) for k, v in params.items()}
         preset = (
             recurrentgemma.Preset.RECURRENT_GEMMA_2B_V1
             if "2b" in os.path.basename(model_path)
             else recurrentgemma.Preset.RECURRENT_GEMMA_9B_V1
         )
-        model_config = recurrentgemma.GriffinConfig.from_torch_params(
-            params, preset=preset
-        )
-        model = recurrentgemma.Griffin(
-            model_config, device=device, dtype=torch.bfloat16
-        )
-        model.load_state_dict(params)
+        model_config = recurrentgemma.GriffinConfig.from_torch_params(params, preset=preset)
+        model = recurrentgemma.Griffin(model_config, device=device, dtype=torch.bfloat16)
+        print(backend.allocated_memory())
+        if torch.cuda.device_count() > 1:
+            no_split_classes = [
+                "ResidualBlock",
+                "RecurrentBlock",
+                "LocalAttentionBlock",
+            ]
+            print("Using accelerate for multi-GPU inference")
+            balanced_mem = get_balanced_memory(
+                model,
+                no_split_module_classes=no_split_classes,
+                low_zero=True,
+            )
+            print(f"balanced memory: {balanced_mem}")
+
+            device_map = infer_auto_device_map(
+                model,
+                max_memory=balanced_mem,
+                no_split_module_classes=no_split_classes,
+            )
+            model = load_checkpoint_and_dispatch(
+                model, checkpoint=model_path, device_map=device_map
+            )
+        else:
+            print("Using single-GPU setup")
+            model.load_state_dict(params)
+        assert model is not None, "Model cannot be none"
+        model.eval()
+
+        layers_per_device = defaultdict(int)
+        for name, param in model.named_parameters():
+            layers_per_device[param.device] += 1
+
         vocab = spm.SentencePieceProcessor()
         vocab.Load(tokenizer_path)
         if needle_focus:
-            needle_ids = vocab.encode(needle_str, out_type=int)
+            needle_ids = vocab.encode(needle_str, out_type=int)  # type: ignore
 
         sampler = recurrentgemma.Sampler(model=model, vocab=vocab)
 
@@ -120,110 +165,62 @@ if __name__ == "__main__":
                 print(f"⚠️ Empty prompt file: {filename}, skipping...")
                 continue
 
-            prompt = (
-                prompts["content"][0]["content"]
-                + "\n"
-                + prompts["content"][1]["content"]
-            )
+            prompt = prompts["content"]
             total_chars += len(prompt)
             all_prompts.append(prompt)
             filenames.append(filename)
             print(f"🔍 Prompt from {filename} length: {len(prompt)} chars")
 
         print(f"🔍 Total number of prompts: {len(all_prompts)}")
-        print(
-            f"🔍 Average prompt length: {total_chars / len(all_prompts):.2f} chars"
-        )
+        print(f"🔍 Average prompt length: {total_chars / len(all_prompts):.2f} chars")
 
-        # Define batch size
-        BATCH_SIZE = 1  # Start with small batch size
         # intervention
         for k in k_indeces:
-            k_save_dir = f"{save_dir}_K{k}"
+            print(f"\n🔹 Processing k={k}")
+            k_save_dir = save_dir / f"K{k}"
             if not os.path.exists(k_save_dir):
                 os.makedirs(k_save_dir)
             model.enable_sparsification(k=k, metric=metric, prefill=prefill)
             # Process prompts in batches
-            for i in range(0, len(all_prompts), BATCH_SIZE):
-                batch_prompts = all_prompts[i : i + BATCH_SIZE]
-                batch_filenames = filenames[i : i + BATCH_SIZE]
-
-                print(
-                    f"\n🔹 Processing batch {i//BATCH_SIZE + 1}/{(len(all_prompts) + BATCH_SIZE - 1)//BATCH_SIZE}"
-                )
-                print("🔍 Batch size: {len(batch_prompts)} prompts")
-                print("🔍 Memory before batch:")
-                print(
-                    f"Allocated: {backend['allocated_memory']() / 1024**2:.2f}MB"
-                )
-
-                for i, (prompt, filename) in enumerate(
-                    zip(batch_prompts, batch_filenames)
-                ):
-                    try:
-                        if needle_focus:
-                            model.enable_needle_focus(
-                                find_sequence(
-                                    torch.tensor(
-                                        vocab.encode(prompt, out_type=int)
-                                    ),
-                                    needle_ids,
-                                ),
-                                needle_scaling,
-                            )
-
+            try:
+                torch.cuda.memory._record_memory_history()
+                for i in range(0, len(all_prompts), BATCH_SIZE):
+                    batch_prompts = all_prompts[i : i + BATCH_SIZE]
+                    batch_filenames = filenames[i : i + BATCH_SIZE]
+                    number_batches = (len(all_prompts) + BATCH_SIZE - 1) // BATCH_SIZE
+                    batch_number = i // BATCH_SIZE + 1
+                    print(f"\n🔹 Processing batch {batch_number}/{number_batches}")
+                    print(f"🔍 Batch size: {len(batch_prompts)} prompts")
+                    print(f"🔍 File names: {batch_filenames} prompts")
+                    with torch.no_grad():
                         out_data = sampler(
-                            input_strings=[prompt], total_generation_steps=100
+                            input_strings=batch_prompts,
+                            total_generation_steps=40,
                         )
 
-                        # Debug output data
-                        print(f"🔍 Output data type: {type(out_data)}")
-                        print(f"🔍 Output data attributes: {dir(out_data)}")
-                        print(
-                            f"🔍 Number of outputs: {len(out_data.text) if hasattr(out_data, 'text') else 'No text attribute'}"
-                        )
-                        out_string = out_data.text[0]
-                        # Save results for this batch
-                        print(
-                            f"🔍 Output length: {len(out_string) if out_string else 0} chars"
-                        )
+                    for j, filename in enumerate(batch_filenames):
+                        out_string = out_data.text[j]
+
+                        print(f"🔍 Output length: {len(out_string) if out_string else 0} chars")
                         if not out_string or len(out_string.strip()) == 0:
-                            print(f"⚠️ Empty output for prompt from {filename}")
-                            print(
-                                f"🔍 Input prompt length: {len(prompt)} chars"
-                            )
-                            print(
-                                f"🔍 First 100 chars of input prompt: {prompt[:100]}"
-                            )
-                            continue
+                            raise ValueError("Empty output")
 
                         basename = os.path.basename(filename)
-                        newname = basename.replace(".json", ".txt").replace(
-                            "_prompts", ""
-                        )
-                        save_path = f"{k_save_dir}/{newname}"
+                        newname = basename.replace(".json", ".txt").replace("_prompts", "")
+                        save_path = k_save_dir / f"{newname}"
                         with open(save_path, "w") as f:
                             f.write(out_string)
                         print(f"✅ Saved prediction: {save_path}")
                         model.disable_needle_focus()
+                    print(backend.allocated_memory())
+                    backend.empty_cache()
 
-                        # Clear memory after each batch
-                        backend["empty_cache"]()
-                        print("🔍 CUDA memory after batch cleanup:")
-                        print(
-                            f"Allocated: {backend['allocated_memory']() / 1024**2:.2f}MB"
-                        )
-                    except RuntimeError as e:
-                        print(
-                            f"🚨 Error processing batch {i // BATCH_SIZE + 1}!"
-                        )
-                        print(f"Error details: {str(e)}")
-                        raise e
+            except RuntimeError as e:
+                raise RuntimeError(f"🚨 Error processing batch {batch_number}!\n{str(e)}") from e
 
         print("🎉 All predictions completed successfully!")
 
     except Exception as e:
-        print(f"🚨 Fatal error in script: {e}")
-        print(f"Error type: {type(e)}")
-        print(f"Error details: {str(e)}")
-        exit(1)
+        raise Exception(
+            f"🚨 Fatal error in script: {e}\nError type: {type(e)}\nError details: {str(e)}"
+        ) from e
