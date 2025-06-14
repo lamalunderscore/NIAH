@@ -1,50 +1,23 @@
 # pred.py
 import glob
 import json
-import os
 import sys
-from collections import defaultdict
-from dataclasses import dataclass
+from os import getenv
 from pathlib import Path
-from typing import Callable, Dict
 
-import sentencepiece as spm
 import torch
 import yaml
-from accelerate import (
-    infer_auto_device_map,
-    load_checkpoint_and_dispatch,
-)
-from accelerate.utils import get_balanced_memory
-from recurrentgemma import torch as recurrentgemma
+from utils import BackEnd, Huggingface, RecurrentGemmaKaggle
 
 
 # If python does not find recurrent_gemma, add to correct directory to path:
 sys.path.append(".")
 
 CONF_FILE = "config.yaml"
-BATCH_SIZE = 2
-
-
-def find_sequence(inputs, needle):
-    print(needle)
-    print(inputs)
-    needle_len = needle.size(0)
-    input_len = inputs.size(0)
-    for i in range(input_len - needle_len + 1):
-        if torch.equal(inputs[i : i + needle_len], needle):
-            return [pos for pos in range(i, i + needle_len)]
-    return None
-
-
-@dataclass
-class BackEnd:
-    allocated_memory: Callable[[], Dict[str, float]]
-    empty_cache: Callable[[], None]
 
 
 if __name__ == "__main__":
-    print(f"visible devices: {os.getenv('CUDA_VISIBLE_DEVICES')}")
+    print(f"visible devices: {getenv('CUDA_VISIBLE_DEVICES')}")
     try:
         config_path = Path(__file__).resolve().parent / CONF_FILE
         with open(config_path, "r") as file:
@@ -53,9 +26,11 @@ if __name__ == "__main__":
         prompt_dir = parent_dir / config["prompt"]["save_dir"]
         save_dir = parent_dir / config["pred"]["save_dir"]
 
+        model_type = config["pred"]["model_type"].lower()
         tokenizer_type = config["prompt"]["tokenizer"]["tokenizer_type"]
         model_path = config["pred"]["model_path"]
         tokenizer_path = config["pred"]["tokenizer_path"]
+        batch_size = config["pred"]["batch_size"]
 
         k_indeces = config["pred"]["sparsification"]["k"]
         metric = config["pred"]["sparsification"]["metric"]
@@ -66,83 +41,18 @@ if __name__ == "__main__":
         needle_scaling = config.get("needle_scaling")  # not implemented
 
         print(f"🔹 Prompt directory (relative): {prompt_dir}")
-        print(f"🔹 Prompt directory (absolute): {os.path.abspath(prompt_dir)}")
+        print(f"🔹 Prompt directory (absolute): {prompt_dir.resolve()}")
         print(f"🔹 Tokenizer provider: {tokenizer_type}")
 
-        device = "cpu"
-        backend = BackEnd(
-            allocated_memory=lambda: 0,
-            empty_cache=lambda: None,
-        )
-        if torch.cuda.is_available():
-            backend = BackEnd(
-                allocated_memory=lambda: {
-                    str(i): torch.cuda.memory_allocated(torch.device(f"cuda:{i}")) / 1024**2
-                    for i in range(torch.cuda.device_count())
-                },
-                empty_cache=torch.cuda.empty_cache,
-            )
-            device = "cuda"
-        elif torch.backends.mps.is_available():
-            backend = BackEnd(
-                allocated_memory={"1": torch.mps.current_allocated_memory() / 1024**2},
-                empty_cache=torch.mps.empty_cache,
-            )
-            device = "mps"
+        backend = BackEnd()
 
-        print(f"Running on device '{device}'")
+        print(f"Running on device '{backend.device}'")
 
-        # Load parameters
+        ALL_MODELS = {"huggingface": Huggingface, "recurrentgemma": RecurrentGemmaKaggle}
+        # Load model
+        model = ALL_MODELS[model_type](model_path, tokenizer_path, backend.device)
 
-        params = torch.load(model_path)
-        params = {k: v.to(device=device, dtype=torch.bfloat16) for k, v in params.items()}
-        preset = (
-            recurrentgemma.Preset.RECURRENT_GEMMA_2B_V1
-            if "2b" in os.path.basename(model_path)
-            else recurrentgemma.Preset.RECURRENT_GEMMA_9B_V1
-        )
-        model_config = recurrentgemma.GriffinConfig.from_torch_params(params, preset=preset)
-        model = recurrentgemma.Griffin(model_config, device=device, dtype=torch.bfloat16)
-        print(backend.allocated_memory())
-        if torch.cuda.device_count() > 1:
-            no_split_classes = [
-                "ResidualBlock",
-                "RecurrentBlock",
-                "LocalAttentionBlock",
-            ]
-            print("Using accelerate for multi-GPU inference")
-            balanced_mem = get_balanced_memory(
-                model,
-                no_split_module_classes=no_split_classes,
-                low_zero=True,
-            )
-            print(f"balanced memory: {balanced_mem}")
-
-            device_map = infer_auto_device_map(
-                model,
-                max_memory=balanced_mem,
-                no_split_module_classes=no_split_classes,
-            )
-            model = load_checkpoint_and_dispatch(
-                model, checkpoint=model_path, device_map=device_map
-            )
-        else:
-            print("Using single-GPU setup")
-            model.load_state_dict(params)
-        assert model is not None, "Model cannot be none"
-        model.eval()
-
-        layers_per_device = defaultdict(int)
-        for name, param in model.named_parameters():
-            layers_per_device[param.device] += 1
-
-        vocab = spm.SentencePieceProcessor()
-        vocab.Load(tokenizer_path)
-        if needle_focus:
-            needle_ids = vocab.encode(needle_str, out_type=int)  # type: ignore
-
-        sampler = recurrentgemma.Sampler(model=model, vocab=vocab)
-
+        # set up prompts
         pattern = f"{prompt_dir}/{tokenizer_type}_*_prompts.json"
         print(f"🔹 Looking for prompt files matching pattern: {pattern}")
         prompt_files = glob.glob(pattern)
@@ -168,7 +78,7 @@ if __name__ == "__main__":
             prompt = prompts["content"]
             total_chars += len(prompt)
             all_prompts.append(prompt)
-            filenames.append(filename)
+            filenames.append(Path(filename))
             print(f"🔍 Prompt from {filename} length: {len(prompt)} chars")
 
         print(f"🔍 Total number of prompts: {len(all_prompts)}")
@@ -178,45 +88,41 @@ if __name__ == "__main__":
         for k in k_indeces:
             print(f"\n🔹 Processing k={k}")
             k_save_dir = save_dir / f"K{k}"
-            if not os.path.exists(k_save_dir):
-                os.makedirs(k_save_dir)
-            model.enable_sparsification(k=k, metric=metric, prefill=prefill)
+            if not k_save_dir.exists():
+                k_save_dir.mkdir(parents=True, exist_ok=True)
+            model.model.enable_sparsification(k=k, metric=metric, prefill=prefill)
             # Process prompts in batches
             try:
                 torch.cuda.memory._record_memory_history()
-                for i in range(0, len(all_prompts), BATCH_SIZE):
-                    batch_prompts = all_prompts[i : i + BATCH_SIZE]
-                    batch_filenames = filenames[i : i + BATCH_SIZE]
-                    number_batches = (len(all_prompts) + BATCH_SIZE - 1) // BATCH_SIZE
-                    batch_number = i // BATCH_SIZE + 1
+                for i in range(0, len(all_prompts), batch_size):
+                    batch_prompts = all_prompts[i : i + batch_size]
+                    batch_filenames = filenames[i : i + batch_size]
+                    number_batches = (len(all_prompts) + batch_size - 1) // batch_size
+                    batch_number = i // batch_size + 1
                     print(f"\n🔹 Processing batch {batch_number}/{number_batches}")
                     print(f"🔍 Batch size: {len(batch_prompts)} prompts")
                     print(f"🔍 File names: {batch_filenames} prompts")
                     with torch.no_grad():
-                        out_data = sampler(
-                            input_strings=batch_prompts,
-                            total_generation_steps=40,
-                        )
+                        out_data = model(batch_prompts)
 
                     for j, filename in enumerate(batch_filenames):
-                        out_string = out_data.text[j]
+                        out_string = out_data[j]
 
                         print(f"🔍 Output length: {len(out_string) if out_string else 0} chars")
                         if not out_string or len(out_string.strip()) == 0:
                             raise ValueError("Empty output")
 
-                        basename = os.path.basename(filename)
+                        basename = filename.name
                         newname = basename.replace(".json", ".txt").replace("_prompts", "")
                         save_path = k_save_dir / f"{newname}"
                         with open(save_path, "w") as f:
                             f.write(out_string)
                         print(f"✅ Saved prediction: {save_path}")
-                        model.disable_needle_focus()
-                    print(backend.allocated_memory())
+                    print(backend.allocated_memory)
                     backend.empty_cache()
-
             except RuntimeError as e:
                 raise RuntimeError(f"🚨 Error processing batch {batch_number}!\n{str(e)}") from e
+            model.model.disable_sparsification()
 
         print("🎉 All predictions completed successfully!")
 

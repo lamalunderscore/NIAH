@@ -1,35 +1,43 @@
-parent_dir: NIAH/Needle_test/RG/2B
-prompt:
-  save_dir: "../prompts_base"
-  needle: "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n"
-  haystack_dir: "../../PaulGrahamEssays"
-  retrieval_question: "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:"
-  context:
-    min_len: 250
-    max_len: 4096
-    interval: 10
-    manually_select_list: null  # null or a list of context lengths to manually select
-  document_depth:
-    min_percent: 0
-    max_percent: 100
-    interval: 10
-    interval_type: "linear"  # "linear", "sigmoid" or null
-    manually_select_list: null  # null or a list of document percents to manually select
-  tokenizer:
-    tokenizer_type: "Huggingface" # "OpenAI", "Anthropic" or "Huggingface"
-    model_name: "google/recurrentgemma-2b" # Change it to your own model name / HF model path
-  is_base: true # If prompts are for a base model (basic string) or IT model (chat dict)
-  is_jrt: true # if Just-Read-Twice method should be applied.
-pred:
-  save_dir: "pred"
-  sparsification:
-    k: [10]
-    metric: "entropy"
-    prefill: False
-  # ckpt_path in notebook
-  model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
-  model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
 eval:
-  save_dir: "results"
+  save_dir: results
+parent_dir: NIAH/Needle_test/Jamba
+pred:
+  batch_size: 1
+  model_path: "ai21labs/AI21-Jamba-Mini-1.6"
+  model_type: Huggingface
+  save_dir: pred
+  sparsification:
+    k:
+    - 32
+    metric: entropy
+    prefill: false
+  tokenizer_path: ai21labs/AI21-Jamba-Mini-1.6
+prompt:
+  context:
+    interval: 10
+    manually_select_list: null
+    max_len: 4096
+    min_len: 250
+  document_depth:
+    interval: 10
+    interval_type: linear
+    manually_select_list: null
+    max_percent: 100
+    min_percent: 0
+  haystack_dir: ../PaulGrahamEssays
+  is_base: false
+  is_jrt: false
+  needle: '
+
+    The best thing to do in San Francisco is eat a sandwich and sit in Dolores Park
+    on a sunny day.
+
+    '
+  retrieval_question: 'What is the best thing to do in San Francisco? Here is the
+    most relevant sentence in the context:'
+  save_dir: prompts
+  tokenizer:
+    model_name: ai21labs/AI21-Jamba-Mini-1.6
+    tokenizer_type: Huggingface
 vis:
-  save_dir: "vis"
+  save_dir: vis

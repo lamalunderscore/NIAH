@@ -297,7 +297,7 @@ class Prompter:
 
             prompt = f"CONTEXT: {context}\n\nQUESTION: {self.retrieval_question}"
             if self.is_jrt:
-                prompt += f"\n\n{prompt}"
+                prompt += f"\n\nCONTEXT: {context}"
             if self.is_base:
                 prompt += f"\n\nANSWER: {BASE_MODEL_PROMPT_END}"
             else:
