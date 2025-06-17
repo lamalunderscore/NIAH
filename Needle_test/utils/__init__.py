@@ -1,5 +1,7 @@
+"""Import structure for utils."""
+
 from .backend import BackEnd
-from .model_loaders import Huggingface, RecurrentGemmaKaggle
+from .model_loader import load_model
 
 
-__all__ = ("RecurrentGemmaKaggle", "Huggingface")
+__all__ = ("load_model", "BackEnd")

@@ -86,9 +86,7 @@ class Prompter:
         if context_lengths is None:
             if any(x is None for x in [min_len, max_len, num_intervals]):
                 raise ValueError("Either provide context_lengths list or all required parameters")
-            self.context_lengths = np.round(
-                np.linspace(min_len, max_len, num=num_intervals, endpoint=True)
-            ).astype(int)
+            self.context_lengths = np.round(np.linspace(min_len, max_len, num=num_intervals, endpoint=True)).astype(int)
         else:
             self.context_lengths = np.array(context_lengths)
         print(f"✅ Context lengths set: {self.context_lengths}")
@@ -262,7 +260,6 @@ class Prompter:
 
             while self.get_context_length_in_tokens(context) < max_context_length:
                 for file in file_list:
-                    print(f"📄 Reading: {os.path.basename(file)}")
                     with open(file, "r") as f:
                         context += f.read()
                     files_read += 1
@@ -398,9 +395,7 @@ if __name__ == "__main__":
             document_depth_percent_max=config["prompt"]["document_depth"]["max_percent"],
             document_depth_percent_intervals=config["prompt"]["document_depth"]["interval"],
             document_depth_percents=config["prompt"]["document_depth"]["manually_select_list"],
-            document_depth_percent_interval_type=config["prompt"]["document_depth"][
-                "interval_type"
-            ],
+            document_depth_percent_interval_type=config["prompt"]["document_depth"]["interval_type"],
             tokenizer_type=config["prompt"]["tokenizer"]["tokenizer_type"],
             model_name=config["prompt"]["tokenizer"]["model_name"],
             is_jrt=config["prompt"]["is_jrt"],

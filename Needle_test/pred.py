@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 import yaml
-from utils import BackEnd, Huggingface, RecurrentGemmaKaggle
+from utils import BackEnd, load_model
 
 
 # If python does not find recurrent_gemma, add to correct directory to path:
@@ -48,9 +48,8 @@ if __name__ == "__main__":
 
         print(f"Running on device '{backend.device}'")
 
-        ALL_MODELS = {"huggingface": Huggingface, "recurrentgemma": RecurrentGemmaKaggle}
         # Load model
-        model = ALL_MODELS[model_type](model_path, tokenizer_path, backend.device)
+        model = load_model(model_type, model_path, device=backend.device)
 
         # set up prompts
         pattern = f"{prompt_dir}/{tokenizer_type}_*_prompts.json"
@@ -92,6 +91,7 @@ if __name__ == "__main__":
                 k_save_dir.mkdir(parents=True, exist_ok=True)
             model.model.enable_sparsification(k=k, metric=metric, prefill=prefill)
             # Process prompts in batches
+            batch_number = 0
             try:
                 torch.cuda.memory._record_memory_history()
                 for i in range(0, len(all_prompts), batch_size):
@@ -127,6 +127,4 @@ if __name__ == "__main__":
         print("🎉 All predictions completed successfully!")
 
     except Exception as e:
-        raise Exception(
-            f"🚨 Fatal error in script: {e}\nError type: {type(e)}\nError details: {str(e)}"
-        ) from e
+        raise Exception(f"🚨 Fatal error in script: {e}\nError type: {type(e)}\nError details: {str(e)}") from e

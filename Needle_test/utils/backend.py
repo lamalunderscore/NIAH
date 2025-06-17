@@ -1,6 +1,6 @@
 """Implementing the BackEnd class."""
 
-from typing import Callable, Dict, Union
+from collections.abc import Callable
 
 import torch
 
@@ -23,7 +23,7 @@ class BackEnd:
             self.empty_cache: Callable[[], None] = torch.cuda.empty_cache
             self._device = "cuda"
         elif torch.backends.mps.is_available():
-            self._allocated_memory = torch.mps.current_allocated_memory() / 1024**2
+            self._allocated_memory = lambda: torch.mps.current_allocated_memory() / 1024**2
             self.empty_cache: Callable[[], None] = torch.mps.empty_cache
             self._device = "mps"
         else:
@@ -33,7 +33,7 @@ class BackEnd:
             self._device = "cpu"
 
     @property
-    def allocated_memory(self) -> Union[Dict[str, float], float]:
+    def allocated_memory(self) -> dict[str, float] | float:
         return self._allocated_memory()
 
     @property

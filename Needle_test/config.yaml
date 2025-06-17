@@ -1,8 +1,8 @@
-parent_dir: NIAH/Needle_test/RG/2B
+parent_dir: Jamba/
 prompt:
-  save_dir: "../prompts_base"
+  save_dir: "prompts"
   needle: "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n"
-  haystack_dir: "../../PaulGrahamEssays"
+  haystack_dir: "../PaulGrahamEssays"
   retrieval_question: "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:"
   context:
     min_len: 250
@@ -17,20 +17,19 @@ prompt:
     manually_select_list: null  # null or a list of document percents to manually select
   tokenizer:
     tokenizer_type: "Huggingface" # "OpenAI", "Anthropic" or "Huggingface"
-    model_name: "google/recurrentgemma-2b" # Change it to your own model name / HF model path
-  is_base: true # If prompts are for a base model (basic string) or IT model (chat dict)
-  is_jrt: true # if Just-Read-Twice method should be applied.
+    model_name:  ai21labs/AI21-Jamba-Mini-1.6 # Change it to your own model name / HF model path
+  is_base: false # If prompts are for a base model (basic string) or IT model (chat dict)
+  is_jrt: false # if Just-Read-Twice method should be applied.
 pred:
-  batch_size: 2
-  save_dir: "pred"
+  batch_size: 1
+  save_dir: "attn"
   sparsification:
-    k: [10]
+    k: [32]
     metric: "entropy"
     prefill: False
   # ckpt_path in notebook
-  model_type: "recurrentgemma" # use 'huggingface' for any implemented huggingface model
-  model_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/2b.pt"
-  tokenizer_path: "/root/.cache/kagglehub/models/google/recurrentgemma/PyTorch/2b/1/tokenizer.model"
+  model_type: "huggingface" # use 'huggingface' for any implemented huggingface model
+  model_path: ai21labs/AI21-Jamba-Mini-1.6
 eval:
   save_dir: "results"
 vis:
