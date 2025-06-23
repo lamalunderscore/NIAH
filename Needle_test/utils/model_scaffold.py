@@ -1,9 +1,10 @@
 """Scaffold classes to load models and interact with them in a generic way."""
 
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from glob import glob
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 import kagglehub
 import sentencepiece as spm
@@ -47,20 +48,34 @@ class Model(ABC):
         self._model_init(model_id, tokenizer_id)
         self._attention_recorders: dict[str, AttentionRecorder] | None = None
 
+    @abstractmethod
+    def _model_init(self, model_id: str, tokenizer_id: str | None): ...
+
+    @abstractmethod
+    def find_needle(self, needle: str, prompt: str | dict[str, str]) -> list[int] | None: ...
+
+    @abstractmethod
+    def get_output(self, *args: Any, **kwargs: Any) -> list[str]: ...
+
+    @abstractmethod
+    def load_model(self, *args: Any, **kwargs: Any) -> Any: ...
+
     def __call__(self, inputs, **kwargs):
         return self.get_output(inputs, **kwargs)
 
-    def get_recorded_attention(self) -> dict[str, list[torch.Tensor | Any] | torch.Tensor] | None:
+    def _get_single_mode_attention(self, get_mode: Literal["gen", "prefill"]):
         if isinstance(self._attention_recorders, dict):
             recorded_attention_dict: dict[str, list[torch.Tensor | None] | torch.Tensor] = {}
             for name, recorder in self._attention_recorders.items():
                 assert isinstance(recorder, AttentionRecorder)
-                recorded_attention = recorder.get()
-                if recorded_attention is None or (isinstance(recorded_attention, list) and not recorded_attention):
+                recorded_attention = recorder.get_clear(get_mode)
+                if recorded_attention is None or (
+                    recorder.record_mode == "all" and not recorded_attention
+                ):
                     print(
                         f"Warning: No data found when getting recorded attention from {name}. Either the model did not run yet, "
                         "attention recording was not initialized (use `self.model.enable_attention_recording()`), or the initialization failed. "
-                        "Omitting this recorder."
+                        "Omitting this recorder. (in Model.get_recorded_attention)"
                     )
                     continue
                 recorded_attention_dict[name] = recorded_attention
@@ -73,65 +88,175 @@ class Model(ABC):
         else:
             raise TypeError("self._attention_recorders has an invalid type.")
 
+    @overload
+    def get_recorded_attention(
+        self, get_mode: Literal["prefill"] = "prefill"
+    ) -> dict[str, list[torch.Tensor | Any] | torch.Tensor] | None: ...
+
+    @overload
+    def get_recorded_attention(
+        self, get_mode: Literal["gen"] = "gen"
+    ) -> dict[str, list[torch.Tensor | Any] | torch.Tensor] | None: ...
+
+    @overload
+    def get_recorded_attention(
+        self, get_mode: Literal["both"] = "both"
+    ) -> tuple[
+        dict[str, list[torch.Tensor | Any] | torch.Tensor] | None,
+        dict[str, list[torch.Tensor | Any] | torch.Tensor] | None,
+    ]: ...
+
+    def get_recorded_attention(
+        self, get_mode: Literal["gen", "prefill", "both"] = "both"
+    ) -> (
+        tuple[
+            dict[str, list[torch.Tensor | Any] | torch.Tensor] | None,
+            dict[str, list[torch.Tensor | Any] | torch.Tensor] | None,
+        ]
+        | dict[str, list[torch.Tensor | Any] | torch.Tensor]
+        | None
+    ):
+        if get_mode == "both":
+            return (
+                self._get_single_mode_attention("gen"),
+                self._get_single_mode_attention("prefill"),
+            )
+        else:
+            return self._get_single_mode_attention(get_mode)
+
     def enable_attention_recording(
         self,
         record_mode: Literal["first", "last", "all"] = "first",
     ):
         """Enable attention recording."""
         attention_modules = self.model.attention_modules
-        assert attention_modules is not None, "No attention blocks found. Error in model initialization."
+        assert attention_modules is not None, (
+            "No attention blocks found. Error in model initialization."
+        )
         self._attention_recorders = {}
         for name in attention_modules:
             recorder = AttentionRecorder(name, record_mode=record_mode)
             attention_modules[name].attention_recorder = recorder
             self._attention_recorders[name] = recorder
-        print(f"enabled attention recording. Initialized {len(self._attention_recorders.keys())} recorders.")
+        print(
+            f"Enabled attention recording. Initialized {len(self._attention_recorders.keys())} recorders."
+        )
 
     def disable_attention_recording(self):
         """Disable attention recording."""
         attention_modules = self.model.attention_modules
-        assert attention_modules is not None, "No attention blocks found. Error in model initialization."
+        assert attention_modules is not None, (
+            "No attention blocks found. Error in model initialization."
+        )
         if self._attention_recorders is not None:
             for name in attention_modules:
                 attention_modules[name].attention_recorder = None
             self._attention_recorders = None
             print("Disabled attention recording")
         else:
-            print("Warning: Attention recording was already disabled. Ignore this message if it was expected.")
+            print(
+                "Warning: Attention recording was already disabled. Ignore this message if it was expected."
+            )
 
-    def _set_sparse_attributes(
+    def _set_sparse_head_attributes(
         self,
         k: int | None = None,
         metric: str | None = None,
         prefill: bool | None = False,
     ):
         attention_modules = self.model.attention_modules
-        assert attention_modules is not None, "No attention blocks found. Error in model initialization."
+        assert attention_modules is not None, (
+            "No attention blocks found. Error in model initialization."
+        )
         for layer in attention_modules.values():
             layer.topk_heads = k
             layer.sparsity_metric = metric
             layer.sparsity_prefill = prefill
 
-    def enable_sparsification(self, k: int = 2, metric="entropy", prefill: bool = False):
+    def enable_head_sparsification(self, k: int = 2, metric="entropy", prefill: bool = False):
         """Enable attention head sparsification.
 
         Specify k value, norm, and if it should be applied during prefill.
         """
-        self._set_sparse_attributes(k, metric, prefill)
+        self._set_sparse_head_attributes(k, metric, prefill)
+        print(f"Enabled head sparsification with k={k}, metric={metric}, prefill={prefill}.")
 
-    def disable_sparsification(self):
+    def disable_head_sparsification(self):
         """Disable attention head sparsification."""
-        self._set_sparse_attributes()
-        print("disabled sparsification")
+        self._set_sparse_head_attributes()
+        print("Disabled head sparsification.")
 
-    @abstractmethod
-    def _model_init(self, model_id: str, tokenizer_id: str | None): ...
+    def _set_manipulation_attributes(
+        self,
+        indices: list[int] | None = None,
+        prefill_indices: list[int] | None = None,
+        gen_mode: Literal["ommit", "only", "balanced"] | None = None,
+        prefill_mode: Literal["ommit", "only", "balanced", "follow", "keep", "null"] | None = None,
+    ):
+        attention_modules = self.model.attention_modules
+        assert attention_modules is not None, (
+            "No attention blocks found. Error in model initialization."
+        )
+        for layer in attention_modules.values():
+            layer.manipulate_gen_indices = indices
+            layer.manipulate_prefill_indices = (
+                indices if prefill_indices is None else prefill_indices
+            )
 
-    @abstractmethod
-    def get_output(self, *args: Any, **kwargs: Any) -> list[str]: ...
+            layer.manipulate_gen = gen_mode
+            if prefill_mode == "follow":
+                prefill_mode = gen_mode
+            layer.manipulate_prefill = prefill_mode
 
-    @abstractmethod
-    def load_model(self, *args: Any, **kwargs: Any) -> Any: ...
+    @overload
+    def enable_weight_manipulation(
+        self,
+        indices: list[int],
+        prefill_indices: list[int],
+        *,
+        gen_mode: Literal["ommit", "only", "balanced"] = "ommit",
+        prefill_mode: Literal["ommit", "only", "balanced", "follow", "keep", "null"] = "keep",
+    ): ...
+
+    @overload
+    def enable_weight_manipulation(
+        self,
+        indices: list[int],
+        *,
+        gen_mode: Literal["ommit", "only", "balanced"] = "ommit",
+        prefill_mode: Literal["ommit", "only", "balanced", "follow", "keep", "null"] = "keep",
+    ): ...
+
+    def enable_weight_manipulation(
+        self,
+        indices: list[int],
+        prefill_indices: list[int] | None = None,
+        *,
+        gen_mode: Literal["ommit", "only", "balanced"] = "ommit",
+        prefill_mode: Literal["ommit", "only", "balanced", "follow", "keep", "null"] = "keep",
+    ):
+        """Enable attention head sparsification.
+
+        Specify indices to be manipulated, mode, and if it should be applied during prefill.
+        """
+        self._set_manipulation_attributes(indices, prefill_indices, gen_mode, prefill_mode)
+        print(
+            f"Enabled weight manipulation on tokens {indices[0]}-{indices[-1]} token, gen_mode={gen_mode}, prefill_mode={prefill_mode}."
+        )
+
+    def disable_weight_manipulation(self):
+        """Disable attention head sparsification."""
+        self._set_manipulation_attributes()
+        print("Disabled weight manipulation.")
+
+    def _find_needle(self, needle: list[int], haystack: list[int]):
+        needle_len = len(needle)
+        input_len = len(haystack)
+        for i in range(input_len - needle_len + 1):
+            haystack_batch = haystack[i : i + needle_len]
+            if haystack_batch == needle:
+                return list(range(i, i + needle_len))
+        return None
 
 
 ALL_HUGGINGFACE_IMPLEMENTED = {
@@ -160,17 +285,23 @@ class Huggingface(Model):
             tokenizer_id = model_id
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
 
+    def find_needle(self, needle: str, prompt: str | dict[str, str]):
+        raise NotImplementedError("Not yet implemented.")
+
     def get_output(self, messages, **kwargs):
-        input_ids = self.tokenizer.apply_chat_template(  # TODO, make it respect the base model boolean
-            messages,
-            add_generation_prompt=True,
-            padding=True,
-            return_tensors="pt",
-        ).to(self.model.device)
+        input_ids = (
+            self.tokenizer.apply_chat_template(  # TODO, make it respect the base model boolean
+                messages,
+                add_generation_prompt=True,
+                padding=True,
+                return_tensors="pt",
+            ).to(self.model.device)
+        )
 
         outputs = self.model.generate(input_ids, max_new_tokens=self.max_tokens)
         out_data: list[str] = [
-            self.tokenizer.decode(gen[input_ids.shape[-1] :], skip_special_tokens=True) for gen in outputs
+            self.tokenizer.decode(gen[input_ids.shape[-1] :], skip_special_tokens=True)
+            for gen in outputs
         ]
         return out_data
 
@@ -194,7 +325,7 @@ class Huggingface(Model):
                 no_split_module_classes=no_split_module_classes,
                 dtype=kwargs.get("torch_dtype"),  # type: ignore
             )
-            print(f"max_memory: {max_memory}")
+            print(f"max_memory after correction: {max_memory}")
 
             device_map = infer_auto_device_map(
                 model,
@@ -203,8 +334,49 @@ class Huggingface(Model):
                 dtype=kwargs.get("torch_dtype"),  # type: ignore
             )
 
+            device_map = layer_mapping = OrderedDict(
+                [
+                    ("model.embed_tokens", 0),
+                    ("model.layers.0", 0),
+                    ("model.layers.1", 0),
+                    ("model.layers.2", 0),
+                    ("model.layers.3", 1),
+                    ("model.layers.4", 1),
+                    ("model.layers.5", 1),
+                    ("model.layers.6", 1),
+                    ("model.layers.7", 1),
+                    ("model.layers.8", 2),
+                    ("model.layers.9", 2),
+                    ("model.layers.10", 2),
+                    ("model.layers.11", 2),
+                    ("model.layers.12", 2),
+                    ("model.layers.13", 3),
+                    ("model.layers.14", 3),
+                    ("model.layers.15", 3),
+                    ("model.layers.16", 3),
+                    ("model.layers.17", 3),
+                    ("model.layers.18", 4),
+                    ("model.layers.19", 4),
+                    ("model.layers.20", 4),
+                    ("model.layers.21", 4),
+                    ("model.layers.22", 5),
+                    ("model.layers.23", 5),
+                    ("model.layers.24", 5),
+                    ("model.layers.25", 5),
+                    ("model.layers.26", 6),
+                    ("model.layers.27", 6),
+                    ("model.layers.28", 6),
+                    ("model.layers.29", 6),
+                    ("model.layers.30", 7),
+                    ("model.layers.31", 7),
+                    ("model.final_layernorm", 7),
+                    ("lm_head", 7),
+                ]
+            )
+            print(f"device map: {device_map}")
+
             del model
-            torch.cuda.empty_cache()
+            # raise NotImplementedError("Stop script.")
 
         # Load actual model with device map
         model = model_cls.from_pretrained(model_id, device_map=device_map, **kwargs)  # type: ignore
@@ -216,12 +388,24 @@ class RecurrentGemmaKaggle(Model):
     """Class to scaffold the RG Kaggle implementation."""
 
     def _model_init(self, model_id: str, tokenizer_id: str | None = None):
-        self.model = self.load_model(model_id)
+        self.model, self.tokenizer = self.load_model(model_id)
+
+    def find_needle(self, needle: str, prompt: str | dict[str, str]):
+        needle_ids = self.tokenizer.Encode(needle)[1:-1]
+        prompt_ids = self.tokenizer.Encode(prompt)
+        sequence = self._find_needle(needle_ids, prompt_ids)
+
+        return sequence
 
     def get_output(self, inputs: str | list[str], **gen_kwargs):
         if isinstance(inputs, str):
             inputs = [inputs]
-        outputs = self.sampler(input_strings=inputs, total_generation_steps=self.max_tokens, **gen_kwargs)
+        outputs = self.sampler(
+            input_strings=inputs,
+            total_generation_steps=self.max_tokens,
+            end_sampling_at_eos_token=True,
+            **gen_kwargs,
+        )
         out_data = outputs.text
         return out_data
 
@@ -243,7 +427,11 @@ class RecurrentGemmaKaggle(Model):
 
         params = torch.load(model_path)
         params = {k: v.to(device=device, dtype=dtype) for k, v in params.items()}
-        preset = Preset.RECURRENT_GEMMA_2B_V1 if "2b" in model_path.name else Preset.RECURRENT_GEMMA_9B_V1
+        preset = (
+            Preset.RECURRENT_GEMMA_2B_V1
+            if "2b" in model_path.name
+            else Preset.RECURRENT_GEMMA_9B_V1
+        )
         model_config = GriffinConfig.from_torch_params(params, preset=preset)
         model = Griffin(model_config, device=device, dtype=dtype)
         if device == "cuda" and torch.cuda.device_count() > 1:
@@ -265,7 +453,9 @@ class RecurrentGemmaKaggle(Model):
                 max_memory=balanced_mem,
                 no_split_module_classes=no_split_classes,
             )
-            model = load_checkpoint_and_dispatch(model, checkpoint=model_path, device_map=device_map)
+            model = load_checkpoint_and_dispatch(
+                model, checkpoint=str(model_path), device_map=device_map
+            )
         else:
             print("Using single-GPU setup")
             model.load_state_dict(params)
@@ -273,7 +463,7 @@ class RecurrentGemmaKaggle(Model):
         model.eval()
 
         vocab = spm.SentencePieceProcessor()
-        vocab.Load(tokenizer_path)
+        vocab.Load(str(tokenizer_path))
 
         self.sampler = Sampler(model=model, vocab=vocab)
-        return model
+        return model, vocab

@@ -1,3 +1,5 @@
+"""Module that enables the visualization of results."""
+
 import glob
 import json
 import os
@@ -7,14 +9,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import yaml
-from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-from matplotlib.patches import Patch
+from matplotlib.colors import LinearSegmentedColormap
 
 
 CONF_FILE = "config.yaml"
 
-if __name__ == "__main__":
-    config_path = Path(__file__).resolve().parent / CONF_FILE
+
+def run_vis(config_file: str = CONF_FILE):  # noqa
+    config_path = Path(__file__).resolve().parent / config_file
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -64,12 +66,10 @@ if __name__ == "__main__":
             aggfunc="mean",
         )
 
-        # Binary colormap: red for 0, green for 10
-        binary_cmap = ListedColormap(["#F0496E", "#0CD79F"])
         red_green = LinearSegmentedColormap.from_list("ReGn", ["#F0496E", "yellow", "#0CD79F"])
 
         plt.figure(figsize=(9.0, 8))
-        ax = sns.heatmap(
+        ax = sns.heatmap(  # noqa
             pivot_table,
             fmt="g",
             cmap=red_green,
@@ -77,16 +77,16 @@ if __name__ == "__main__":
             vmin=0,
             vmax=5,
             cbar_kws={
-                "label": "Score (0 = Bad, 5 = Good)",  # label for legend
+                "label": "Score (0 = Failure, 5 = Perfect)",  # label for legend
                 "shrink": 0.8,  # adjust size if needed
             },
         )
 
         # Custom binary legend
-        legend_elements = [
-            Patch(facecolor="#F0496E", edgecolor="black", label="Unsuccessful"),
-            Patch(facecolor="#0CD79F", edgecolor="black", label="Successful"),
-        ]
+        # legend_elements = [
+        #     Patch(facecolor="#F0496E", edgecolor="black", label="Unsuccessful"),
+        #     Patch(facecolor="#0CD79F", edgecolor="black", label="Successful"),
+        # ]
         # ax.legend(
         #     loc="upper right",
         #     frameon=True,
@@ -107,3 +107,6 @@ if __name__ == "__main__":
 
         plt.savefig(save_path, dpi=600)
         plt.close()
+
+
+__all__ = ("run_vis",)

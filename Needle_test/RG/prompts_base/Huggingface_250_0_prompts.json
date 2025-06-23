@@ -3,7 +3,7 @@
   "tokenizer": "Huggingface",
   "context_length": 250,
   "depth_percent": 0,
-  "needle": "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n",
-  "retrieval_question": "What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:",
-  "content": "CONTEXT: \nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\nFebruary 2020What should an essay be? Many people would say persuasive. That's\nwhat a lot of\n\nQUESTION: What is the best thing to do in San Francisco? Here is the most relevant sentence in the context:\n\nCONTEXT: \nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\nFebruary 2020What should an essay be? Many people would say persuasive. That's\nwhat a lot of\n\nANSWER: Here is the most relevant sentence in the context: "
+  "needle": "\n The best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n",
+  "retrieval_question": "What is the best thing to do in San Francisco?",
+  "content": "CONTEXT: \n The best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\nFebruary 2020What should an essay be? Many people would say persuasive. That's\nwhat a lot of\n\nQUESTION: What is the best thing to do in San Francisco?\n\nANSWER: Here is the most relevant sentence in the context: "
 }

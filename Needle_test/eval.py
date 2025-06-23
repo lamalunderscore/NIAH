@@ -1,3 +1,5 @@
+"""Module that enables the evaluation of predictions."""
+
 import json
 import os
 import re
@@ -17,7 +19,25 @@ def clean_text(text):
     return text
 
 
-def evaluate_predictions(pred_base_dir, reference, k_values):
+def compute_score(prediction: str, reference: str) -> float:
+    cleaned_reference = clean_text(reference)
+    cleaned_prediction = clean_text(prediction)
+
+    score = 0
+    if "eat a sandwich" in cleaned_prediction:
+        score += 1
+    if "dolores park" in cleaned_prediction:
+        score += 0.5
+        if "sit in dolores park" in cleaned_prediction:
+            score += 0.5
+    if "on a sunny day" in cleaned_prediction:
+        score += 1
+    if cleaned_reference in cleaned_prediction:
+        score = 5
+    return score
+
+
+def evaluate_predictions(pred_base_dir, reference, k_values):  # noqa: C901
     """Evaluate predictions for each K value directory.
 
     This assumes that predictions are sorted
@@ -33,9 +53,6 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
         dict: Results organized by K value
 
     """
-    # Clean reference text once since it's used multiple times
-    cleaned_reference = clean_text(reference)
-
     # Store results for all K values
     all_results = {}
 
@@ -56,25 +73,7 @@ def evaluate_predictions(pred_base_dir, reference, k_values):
             with open(os.path.join(k_dir, filename), "r") as f:
                 prediction = f.read().strip()
 
-            cleaned_prediction = clean_text(prediction)
-
-            score = 0
-            if "best thing to do in san francisco" in cleaned_prediction:
-                score += 1
-            if "eat a sandwich" in cleaned_prediction:
-                score += 1
-            if "dolores park" in cleaned_prediction:
-                score += 0.5
-                if "sit in dolores park" in cleaned_prediction:
-                    score += 0.5
-            if "on a sunny day" in cleaned_prediction:
-                score += 1
-            if cleaned_reference in cleaned_prediction:
-                score = 5
-
-            # if score == 0:
-            #     print(f"reference: {cleaned_reference}")
-            #     print(f"prediction: {half_prediction}")
+            score = compute_score(prediction, reference)
 
             k_results[filename.replace(".txt", "")] = {
                 "prediction": prediction,
@@ -105,9 +104,8 @@ def compute_summary_statistics(results):
     return summary_stats
 
 
-if __name__ == "__main__":
-    # Load configuration
-    config_path = Path(__file__).resolve().parent / CONF_FILE
+def run_eval(config_file: str = CONF_FILE):  # noqa: D103
+    config_path = Path(__file__).resolve().parent / config_file
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
@@ -163,3 +161,9 @@ if __name__ == "__main__":
         print(f"  Total predictions: {stats['total_predictions']}")
         print(f"  Successful predictions: {stats['successful_predictions']}")
         print(f"  Success rate: {stats['average_points'] * 100:.2f}%")
+
+
+__all__ = (
+    "run_eval",
+    "compute_score",
+)

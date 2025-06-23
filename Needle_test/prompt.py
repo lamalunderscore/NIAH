@@ -1,3 +1,5 @@
+"""Module that enabled the generation of prompts."""
+
 import asyncio
 import glob
 import json
@@ -16,6 +18,7 @@ from transformers import AutoTokenizer
 CONF_FILE = "config.yaml"
 
 BASE_MODEL_PROMPT_END = "Here is the most relevant sentence in the context: "
+IT_MODEL_PROMPT_END = "Output the most relevant sentence in the context, word by word!"
 
 load_dotenv()
 
@@ -121,7 +124,7 @@ class Prompter:
             if self.tokenizer_type == "OpenAI":
                 self.enc = tiktoken.encoding_for_model(self.model_name)
             elif self.tokenizer_type == "Anthropic":
-                self.enc = Anthropic().get_tokenizer()
+                self.enc = Anthropic().get_tokenizer()  # type: ignore
             elif self.tokenizer_type == "Huggingface":
                 self._initialize_huggingface_tokenizer()
             else:
@@ -165,15 +168,15 @@ class Prompter:
     def logistic(x):
         return int(100 / (1 + np.exp(-0.1 * (x - 50))))
 
-    def encode_text_to_tokens(self, text):
+    def encode_text_to_tokens(self, text) -> list[int]:
         try:
             if self.tokenizer_type == "OpenAI":
                 return self.enc.encode(text)
             elif self.tokenizer_type == "Anthropic":
-                return self.enc.encode(text).ids
+                return self.enc.encode(text).ids  # type: ignore
             elif self.tokenizer_type == "Huggingface":
                 return (
-                    self.enc(
+                    self.enc(  # type:ignore
                         text,
                         truncation=False,
                         return_tensors="pt",
@@ -182,6 +185,8 @@ class Prompter:
                     .input_ids.view(-1)
                     .tolist()
                 )
+            else:
+                raise NotImplementedError("tokenizer type not implemented.")
         except Exception as e:
             print(f"❌ Token encoding failed: {str(e)}")
             raise
@@ -193,7 +198,7 @@ class Prompter:
             elif self.tokenizer_type == "Anthropic":
                 return self.enc.decode(tokens[:context_length])
             elif self.tokenizer_type == "Huggingface":
-                return self.enc.decode(tokens[:context_length], skip_special_tokens=True)
+                return self.enc.decode(tokens[:context_length], skip_special_tokens=True)  # type: ignore
         except Exception as e:
             print(f"❌ Token decoding failed: {str(e)}")
             raise
@@ -203,6 +208,8 @@ class Prompter:
         try:
             tokens_needle = self.encode_text_to_tokens(self.needle)
             tokens_context = self.encode_text_to_tokens(context)
+            assert isinstance(tokens_context, list)
+            assert isinstance(tokens_needle, list)
 
             context_length -= self.final_context_length_buffer
             print(f"📊 Context tokens: {len(tokens_context)}, Needle tokens: {len(tokens_needle)}")
@@ -219,6 +226,7 @@ class Prompter:
                 tokens_new_context = tokens_context[:insertion_point]
 
                 period_tokens = self.encode_text_to_tokens(".")
+
                 while tokens_new_context and tokens_new_context[-1] not in period_tokens:
                     insertion_point -= 1
                     tokens_new_context = tokens_context[:insertion_point]
@@ -238,9 +246,9 @@ class Prompter:
             if self.tokenizer_type == "OpenAI":
                 return len(self.enc.encode(context))
             elif self.tokenizer_type == "Anthropic":
-                return len(self.enc.encode(context).ids)
+                return len(self.enc.encode(context).ids)  # type: ignore
             elif self.tokenizer_type == "Huggingface":
-                return self.enc(context, truncation=False, return_tensors="pt").input_ids.shape[-1]
+                return self.enc(context, truncation=False, return_tensors="pt").input_ids.shape[-1]  # type: ignore
         except Exception as e:
             print(f"❌ Context length calculation failed: {str(e)}")
             raise
@@ -290,14 +298,15 @@ class Prompter:
         print(f"\n📋 Processing: length={context_length}, depth={depth_percent}%")
         try:
             context = await self.generate_context(context_length, depth_percent)
-            print(f"✅ Context generated: {len(context)} chars")
+            print(f"✅ Context generated: {len(context)} chars")  # type: ignore
 
             prompt = f"CONTEXT: {context}\n\nQUESTION: {self.retrieval_question}"
             if self.is_jrt:
-                prompt += f"\n\nCONTEXT: {context}"
+                prompt += f"\n\n{prompt}"
             if self.is_base:
                 prompt += f"\n\nANSWER: {BASE_MODEL_PROMPT_END}"
             else:
+                prompt += f" {IT_MODEL_PROMPT_END}"
                 prompt = [
                     {
                         "role": "user",
@@ -373,10 +382,10 @@ class Prompter:
             raise
 
 
-if __name__ == "__main__":
+def run_prompts(config_file: str = CONF_FILE):  # noqa: D103
     try:
         print("📝 Loading configuration...")
-        config_path = Path(__file__).resolve().parent / CONF_FILE
+        config_path = Path(__file__).resolve().parent / config_file
         with open(config_path, "r") as file:
             config = yaml.safe_load(file)
 
@@ -406,3 +415,6 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"🚨 Error initializing Prompter: {str(e)}")
+
+
+__all__ = ("run_prompts",)
